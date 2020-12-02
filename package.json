@@ -4,8 +4,9 @@
   "description": "<h1 align=\"center\" style=\"text-align:center;\">\r   APIAuto\r </h1>",
   "main": "index.js",
   "scripts": {
-    "predev": "nps predev",
+    "predev": "nps pre_dev_build ",
     "dev": "nps dev",
+    "prebuild": "nps pre_dev_build ",
     "build": "nps build"
   },
   "author": "",
