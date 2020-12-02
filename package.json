@@ -1,0 +1,33 @@
+{
+  "name": "apiauto",
+  "version": "1.0.0",
+  "description": "<h1 align=\"center\" style=\"text-align:center;\">\r   APIAuto\r </h1>",
+  "main": "index.js",
+  "scripts": {
+    "predev": "nps predev",
+    "dev": "nps dev",
+    "build": "nps build"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "eve": "^0.5.4",
+    "vue": "2.1.8"
+  },
+  "devDependencies": {
+    "@types/parcel-bundler": "1.12.1",
+    "parcel-bundler": "1.12.4",
+    "parcel-plugin-html-externals": "0.2.0",
+    "ncp": "2.0.0",
+    "nps": "5.10.0",
+    "nps-utils": "1.7.0"
+  },
+  "externals": {
+    "js/**/*": false,
+    "apijson/**/*": false,
+    "md/**/*": false
+  },
+  "alias": {
+    "vue" : "./node_modules/vue/dist/vue.common.js"
+  }
+}

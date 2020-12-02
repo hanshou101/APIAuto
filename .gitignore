@@ -10,3 +10,7 @@ doc
 config/local_env.json
 *.config.json
 .idea
+
+
+.cache/
+package-lock.json
