@@ -157,7 +157,7 @@
                 <img class="icon" src="img/refresh.png"/>
             </a>
             <a v-show="isLocalShow" class="hint--top @cli-tool" data-hint="清空" href="javascript:void(0)" @click="clearLocal()">
-                <svg xmlns:xlink="http://www.w3.org/1999/xlink"  class="icon" >
+                <svg class="icon" >
                     <use xlink:href="svg/icon.svg#trash"></use>
                 </svg>
             </a>
@@ -180,14 +180,14 @@
                         <a class="hint--rounded hint--no-animate" ref="testCaseTexts" @mouseover="setRequestHint(index, item)" href="javascript:void(0)" @click="restoreRemote(item)" > {{(item.Document.version > 0 ? 'V' + item.Document.version : 'V*') + ' ' + item.Document.name  + '    ' + item.Document.url}}</a>
                         <div :style="{ background: item.compareColor }" v-show="item.compareType != null" style="position: absolute;top: 8px;right: 36px;display: inline-block;">
                             <button class="hint--left" ref="testResultButtons" @mouseover="setTestHint(index, item)" v-show="item.compareType != null" @click="handleTest(false, index, item)" style="position: relative;">{{ item.compareMessage + (item.showType == 'before' ? '-前' : '-后') }}</button>
-                            <svg xmlns:xlink="http://www.w3.org/1999/xlink"  class="icon" style="position: relative;margin-left: 10px" @click="downloadTest(index, item)">
+                            <svg class="icon" style="position: relative;margin-left: 10px" @click="downloadTest(index, item)">
                                 <use xlink:href="svg/icon.svg#export-txt"></use>
                             </svg>
                             <button v-show="(item.showType != 'before' && item.compareType != 0) || (item.showType == 'before' && (item.TestRecord || {}).id != null)" @click="handleTest(true, index, item)">{{ item.showType == 'before' ? '错的，撤回' : '对的，纠正' }}</button>
                             <!-- 仅用来占位，解决上面按钮隐藏后，下载图标纵向没对齐 -->
                             <button v-show="! ((item.showType != 'before' && item.compareType != 0) || (item.showType == 'before' && (item.TestRecord || {}).id != null))" style="color: white;background: white;border-color: white;" disabled>对的，纠正</button>
                         </div>
-                        <svg  xmlns:xlink="http://www.w3.org/1999/xlink" v-show="isLocalShow || (item.Document != null && item.Document.userId == User.id)" class="icon" style="margin-right: 5px; top: 13px" @click="remove(item, index, true)">
+                        <svg v-show="isLocalShow || (item.Document != null && item.Document.userId == User.id)" class="icon" style="margin-right: 5px; top: 13px" @click="remove(item, index, true)">
                             <use xlink:href="svg/icon.svg#trash"></use>
                         </svg>
                     </div>
@@ -229,7 +229,7 @@
                             <a v-show="(currentRemoteItem || {}).Document != null" class="hint--top @cli-tool" data-hint="添加" style="font-size:xx-large; margin-bottom: 2px; color: black;"
                                href="javascript:void(0)" @click="if(isRandomListShow || isRandomSubListShow) { randomTestTitle = null; isRandomListShow = false; isRandomSubListShow = false; } else { showExport(true, true, true) }"> + </a>
                             <a v-show="false" href="javascript:void(0)" style="font-size: small;" class="hint--top"  data-hint="共享"  @click="showExport(true, true)">
-                                <svg  xmlns:xlink="http://www.w3.org/1999/xlink" class="icon">
+                                <svg class="icon">
                                     <use xlink:href="svg/icon.svg#share"></use>
                                 </svg>
                             </a>
@@ -237,7 +237,7 @@
                                 <img class="icon" src="img/refresh.png"/>
                             </a>
                             <a class="hint--top @cli-tool" data-hint="隐藏" style="float: right;padding: 8px;height: 100%"  href="javascript:void(0)" @click="showConfig(false, 5)">
-                                <svg  xmlns:xlink="http://www.w3.org/1999/xlink" class="icon close-icon"  >
+                                <svg class="icon close-icon"  >
                                     <use xlink:href="svg/icon.svg#close"></use>
                                 </svg>
                             </a>
@@ -251,14 +251,14 @@
 
                                 <div :style="{ background: item.compareColor }" v-show="! isRandomEditable && item.compareType != null" style="position: absolute;top: 8px;right: 36px;display: inline-block;">
                                     <button class="hint--left" ref="testRandomSubResultButtons" @mouseover="setTestHint(index, item, true)" v-show="item.compareType != null" @click="handleTest(false, index, item, true)" style="position: relative;">{{ item.compareMessage + (item.showType == 'before' ? '-前' : '-后') }}</button>
-                                    <svg xmlns:xlink="http://www.w3.org/1999/xlink"  class="icon" style="position: relative;margin-left: 10px" @click="downloadTest(index, item, true)">
+                                    <svg class="icon" style="position: relative;margin-left: 10px" @click="downloadTest(index, item, true)">
                                         <use xlink:href="svg/icon.svg#export-txt"></use>
                                     </svg>
                                     <button v-show="(item.showType != 'before' && item.compareType != 0) || (item.showType == 'before'&& (item.TestRecord || {}).id != null)" @click="handleTest(true, index, item, true)">{{ item.showType == 'before' ? '错的，撤回' : '对的，纠正' }}</button>
                                     <!-- 仅用来占位，解决上面按钮隐藏后，下载图标纵向没对齐 -->
                                     <button v-show="! ((item.showType != 'before' && item.compareType != 0) || (item.showType == 'before' && (item.TestRecord || {}).id != null))" style="color: white;background: white;border-color: white;" disabled>对的，纠正</button>
                                 </div>
-                                <svg xmlns:xlink="http://www.w3.org/1999/xlink"  v-show="item.Random != null && item.Random.userId == User.id" class="icon" style="margin-right: 5px; top: 13px" @click="remove(item, index, true, true)">
+                                <svg v-show="item.Random != null && item.Random.userId == User.id" class="icon" style="margin-right: 5px; top: 13px" @click="remove(item, index, true, true)">
                                     <use xlink:href="svg/icon.svg#trash"></use>
                                 </svg>
                             </li>
@@ -292,7 +292,7 @@
                                 <div v-show="! isRandomEditable && ((item.Random || {}).count || 1) <= 1" style="position: absolute;top: 10px;right: 36px;display: inline-block;">
                                     <div :style="{ background: item.compareColor }" v-show="item.compareType != null" >
                                         <button class="hint--left" ref="testRandomResultButtons" @mouseover="setTestHint(index, item, true)" v-show="item.compareType != null" @click="handleTest(false, index, item, true)" style="position: relative;">{{ item.compareMessage + (item.showType == 'before' ? '-前' : '-后') }}</button>
-                                        <svg  xmlns:xlink="http://www.w3.org/1999/xlink" class="icon" style="position: relative;margin-left: 10px" @click="downloadTest(index, item, true)">
+                                        <svg class="icon" style="position: relative;margin-left: 10px" @click="downloadTest(index, item, true)">
                                             <use xlink:href="svg/icon.svg#export-txt"></use>
                                         </svg>
                                         <button v-show="(item.showType != 'before' && item.compareType != 0) || (item.showType == 'before' && (item.TestRecord || {}).id != null)" @click="handleTest(true, index, item, true)">{{ item.showType == 'before' ? '错的，撤回' : '对的，纠正' }}</button>
@@ -301,7 +301,7 @@
                                     </div>
                                 </div>
 
-                                <svg  xmlns:xlink="http://www.w3.org/1999/xlink" v-show="item.Random != null && item.Random.userId == User.id" class="icon" style="margin-right: 5px; top: 13px" @click="remove(item, index, true, true)">
+                                <svg v-show="item.Random != null && item.Random.userId == User.id" class="icon" style="margin-right: 5px; top: 13px" @click="remove(item, index, true, true)">
                                     <use xlink:href="svg/icon.svg#trash"></use>
                                 </svg>
                             </li>
@@ -348,7 +348,7 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
                         <div class="left-bar" style="border-top: #DDD 1px solid; position: relative">
                             <a style="padding-left: 10px;padding-right: 2px;font-size: medium;color: black" >请求头 Request Header<a style="display: flex;flex-grow: 1;padding-right: 10px;padding-top: 2px"> (每行都按 key : value 格式)</a></a>
                             <a class="hint--top @cli-tool" data-hint="隐藏" style="float: right;padding: 8px;height: 100%"  href="javascript:void(0)" @click="showConfig(false, 4)">
-                                <svg xmlns:xlink="http://www.w3.org/1999/xlink"  class="icon close-icon"  >
+                                <svg class="icon close-icon"  >
                                     <use xlink:href="svg/icon.svg#close"></use>
                                 </svg>
                             </a>
@@ -369,13 +369,13 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
                 <div class="pull-left">
 
                     <a v-show="! isExpand" href="javascript:void(0)" class="hint--top"  data-hint="全部展开"  @click="expandAll()">
-                        <svg xmlns:xlink="http://www.w3.org/1999/xlink"  class="icon" >
+                        <svg class="icon" >
                             <use xlink:href="svg/icon.svg#expand"></use>
                         </svg>
                     </a>
 
                     <a v-show="isExpand" href="javascript:void(0)" class="hint--top"  data-hint="全部折叠" @click="collapseAll()">
-                        <svg xmlns:xlink="http://www.w3.org/1999/xlink"  class="icon"  >
+                        <svg class="icon"  >
                             <use xlink:href="svg/icon.svg#collapse"></use>
                         </svg>
                     </a>
@@ -383,7 +383,7 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
 
                     <span class="pop-btn" > <!--v-show="historys.length > 0">-->
               <a class="hint--top save-tool"  data-hint="保存到本地" href="javascript:void(0)" @click="showSave(true)">
-                <svg xmlns:xlink="http://www.w3.org/1999/xlink"  class="icon">
+                <svg class="icon">
                   <use xlink:href="svg/icon.svg#save"></use>
                 </svg>
               </a>
@@ -391,7 +391,7 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
                   <li v-for="(his, index) in historys">
                     <a href="javascript:void(0)" @click="restore(his, his.response)"  > {{his.name}}</a>
 
-                    <svg  xmlns:xlink="http://www.w3.org/1999/xlink" class="icon" @click="remove(his, index, false)">
+                    <svg class="icon" @click="remove(his, index, false)">
                       <use xlink:href="svg/icon.svg#trash"></use>
                     </svg>
                   </li>
@@ -399,12 +399,12 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
           </span>
 
                     <a v-show="isTestCaseShow" class="hint--top" data-hint="隐藏共享用例" href="javascript:void(0)">
-                        <svg  xmlns:xlink="http://www.w3.org/1999/xlink" class="icon" @click="showTestCase(false, isLocalShow)">
+                        <svg class="icon" @click="showTestCase(false, isLocalShow)">
                             <use xlink:href="svg/icon.svg#record"></use>
                         </svg>
                     </a>
                     <a v-show="! isTestCaseShow" class="hint--top" data-hint="查看共享用例" href="javascript:void(0)">
-                        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon" @click="showTestCase(true, isLocalShow)">
+                        <svg class="icon" @click="showTestCase(true, isLocalShow)">
                             <use xlink:href="svg/icon.svg#record"></use>
                         </svg>
                     </a>
@@ -425,20 +425,20 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
                 <div class="pull-right">
 
                     <a href="javascript:void(0)" class="hint--top"  data-hint="下载"   @click="showExport(true, false)">
-                        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon">
+                        <svg class="icon">
                             <use xlink:href="svg/icon.svg#export-txt"></use>
                         </svg>
                     </a>
 
                     <a href="javascript:void(0)" class="hint--top"  data-hint="共享"   @click="showExport(true, true)">
-                        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon">
+                        <svg class="icon">
                             <use xlink:href="svg/icon.svg#share"></use>
                         </svg>
                     </a>
 
                     <span class="pop-btn">
                 <a class="hint--top"  data-hint="换肤" href="javascript:void(0)" @click="isThemeShow = true">
-                  <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon">
+                  <svg class="icon">
                     <use xlink:href="svg/icon.svg#theme"></use>
                   </svg>
                 </a>
@@ -506,7 +506,7 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
 
     <!--弹出保存框-->
     <div class="save-box" v-show="isSaveShow">
-        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon close-icon" @click="showSave(false)">
+        <svg class="icon close-icon" @click="showSave(false)">
             <use xlink:href="svg/icon.svg#close"></use>
         </svg>
 
@@ -516,7 +516,7 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
 
     <!--弹出下载文本框-->
     <div class="save-box" v-show="isExportShow">
-        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon close-icon" @click="showExport(false, isExportRemote)">
+        <svg class="icon close-icon" @click="showExport(false, isExportRemote)">
             <use xlink:href="svg/icon.svg#close"></use>
         </svg>
 
@@ -526,7 +526,7 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
 
     <!--弹出设置文本框-->
     <div class="save-box" v-show="isConfigShow">
-        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon close-icon" @click="showConfig(false)">
+        <svg class="icon close-icon" @click="showConfig(false)">
             <use xlink:href="svg/icon.svg#close"></use>
         </svg>
 
@@ -536,7 +536,7 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
 
     <!--弹出删除文本框-->
     <div class="save-box" v-show="isDeleteShow">
-        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon close-icon" @click="showDelete(false, {})">
+        <svg class="icon close-icon" @click="showDelete(false, {})">
             <use xlink:href="svg/icon.svg#close"></use>
         </svg>
 
@@ -556,7 +556,7 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
                                 <div class="card-title">
                                     <a style="font-size: x-large;color: black">{{ ( loginType == "login" ? "登录" : (loginType == "register" ? "注册" : "重置密码") ) + (isAdminOperation ? "(管理员)" : "(测试用户)")}}</a>
                                     <a style="float: right;margin-top: 8px" href="javascript:void(0)" @click="showLogin(false)">
-                                        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon close-icon"  >
+                                        <svg class="icon close-icon"  >
                                             <use xlink:href="svg/icon.svg#close"></use>
                                         </svg>
                                     </a>
@@ -697,11 +697,11 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
 <!--展开 折叠的 UI 组件-->
 <script type="text/x-template" id="expand-template">
     <span class="expand-wraper">
-        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon icon-square icon-square-min" @click="fold($event)" title="折叠">
+        <svg class="icon icon-square icon-square-min" @click="fold($event)" title="折叠">
           <use xlink:href="svg/icon.svg#minus-square"></use>
         </svg>
 
-        <svg xmlns:xlink="http://www.w3.org/1999/xlink" class="icon icon-square icon-square-plus" @click="expand($event)" title="展开">
+        <svg class="icon icon-square icon-square-plus" @click="expand($event)" title="展开">
           <use xlink:href="svg/icon.svg#plus-square"></use>
         </svg>
       </span>
