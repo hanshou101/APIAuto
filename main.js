@@ -589,7 +589,9 @@
       randomSearch: '',
       randomSubPage: 0,
       randomSubCount: 50,
-      randomSubSearch: ''
+      randomSubSearch: '',
+
+      StringUtil:window.StringUtil,
     },
     methods: {
 
