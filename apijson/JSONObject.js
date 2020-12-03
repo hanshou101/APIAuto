@@ -64,3 +64,7 @@ var JSONObject = {
 }
 
 //TODO 取消注释  Object.freeze(JSONObject) //不可修改
+
+export {
+  JSONObject,
+}

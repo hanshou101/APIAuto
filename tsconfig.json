@@ -1,0 +1,65 @@
+{
+  "include": [
+    "**/*.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.vue",
+  ],
+  "exclude": [
+    "node_modules"
+  ],
+  "compilerOptions": {
+    "outDir": "./lib",
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": false,
+    "target": "es5",
+    "module": "esnext",
+    "lib": [
+      "esnext",
+      "esnext.asynciterable",
+      "es5",
+      "dom",
+      "dom.iterable",
+      "scripthost",
+      "webworker"
+    ],
+    "noEmit": false,
+    "strict": true,
+    "noImplicitThis": true,
+    "jsx": "preserve",
+    "importHelpers": true,
+    "moduleResolution": "node",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strictFunctionTypes": true,
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "noImplicitAny": true,
+    "strictPropertyInitialization": true,
+    "allowJs": true,
+    "downlevelIteration": true,
+    "diagnostics": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowUnreachableCode": false,
+    "forceConsistentCasingInFileNames": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "types": [
+      "@types/node"
+    ],
+    "paths": {
+      "@lib-ts/*": [
+        "./lib/sources/*"
+      ],
+      "@lib-cp/*": [
+        "./lib-cp/*"
+      ]
+    },
+    "typeRoots": [],
+    "resolveJsonModule": true,
+    "importsNotUsedAsValues": "remove"
+  }
+}
