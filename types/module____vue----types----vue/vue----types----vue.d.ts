@@ -1,13 +1,9 @@
-import Vue from 'vue';              // WARN 这句话，是必须要的。
-
+import Vue, {VueConstructor} from 'vue/types/vue';              // WARN 这句话，是必须要的。
 
 declare module 'vue/types/vue' {
 // declare module 'vue' {
 
-  interface VueConstructor {
-  }
-
-  interface Vue {
+  interface VueConstructor<T extends Vue = Vue> {
     getTyp(val: any): string;         //
     isObjectArr(val: any): boolean;   //
     fold($event: Event): void;        //
@@ -19,6 +15,10 @@ declare module 'vue/types/vue' {
     onRenderJSONItem(val: Array | object, key: null | string, path: string): any;   //
     setResponseHint(val: object | Array, key: string, $event: Event): void;         //
     getResponseHint(val: object | Array, key: string, $event: Event): string;         //
+  }
+
+  interface Vue {
+
   }
 
   interface VueI18n {

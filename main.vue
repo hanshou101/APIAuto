@@ -4671,6 +4671,6 @@ export default Vue.extend({
 
 </script>
 
-<style lang="stylus" type="text/stylus" scoped>
+<style lang="less" scoped>
 
 </style>
