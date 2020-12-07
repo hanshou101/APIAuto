@@ -42,7 +42,7 @@ var JSONObject = {
   },
   /**判断key是否为数组名
    */
-  isArrayKey: function (key?: null | string, value?: Array<any> | object, isRestful?: boolean) {
+  isArrayKey: function (key?: null | string, value?: Array<any> | null | object, isRestful?: boolean) {
     log(this.TAG, 'isArrayKey  typeof key = ' + (typeof key));
 
     if (key == null) {

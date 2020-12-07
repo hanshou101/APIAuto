@@ -556,7 +556,164 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
 </template>
 
 <script lang="ts">
-import Vue from 'vue';
+import {log}          from 'src/apijson/api-util';
+import {format}       from 'src/apijson/JSONRequest';
+import Vue            from 'vue';
+import {StringUtil}   from './src/apijson/StringUtil';
+import {CodeUtil}     from './src/apijson/CodeUtil';
+import {JSONResponse} from './src/apijson/JSONResponse';
+
+const saveTextAs: (content: string, filename: string) => void = (window as any).saveTextAs;
+const vInput: HTMLInputElement                                = (window as any).vInput;
+const vHeader: HTMLInputElement                               = (window as any).vHeader;
+const vRandom: HTMLInputElement                               = (window as any).vRandom;
+//
+const localforage: { iterate: Function, }                     = (window as any).localforage;
+
+
+var initJson = {};
+var baseUrl: string;
+var inputted: string;
+var handler: number;
+var doc: string;
+var output: string;
+var doneCount: number;
+
+
+var DEBUG = false;
+
+
+// 主题 [key, String, Number, Boolean, Null, link-link, link-hover]
+var themes = [
+  ['#92278f', '#3ab54a', '#25aae2', '#f3934e', '#f34e5c', '#717171'],
+  ['rgb(19, 158, 170)', '#cf9f19', '#ec4040', '#7cc500', 'rgb(211, 118, 126)', 'rgb(15, 189, 170)'],
+  ['#886', '#25aae2', '#e60fc2', '#f43041', 'rgb(180, 83, 244)', 'rgb(148, 164, 13)'],
+  ['rgb(97, 97, 102)', '#cf4c74', '#20a0d5', '#cd1bc4', '#c1b8b9', 'rgb(25, 8, 174)']
+];
+
+
+// APIJSON <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+var PLATFORM_POSTMAN = 'POSTMAN';
+var PLATFORM_SWAGGER = 'SWAGGER';
+var PLATFORM_YAPI    = 'YAPI';
+var PLATFORM_RAP     = 'RAP';
+
+var REQUEST_TYPE_PARAM = 'PARAM';  // GET ?a=1&b=c&key=value
+var REQUEST_TYPE_FORM  = 'FORM';  // POST x-www-form-urlencoded
+var REQUEST_TYPE_DATA  = 'DATA';  // POST form-data
+var REQUEST_TYPE_JSON  = 'JSON';  // POST application/json
+var REQUEST_TYPE_GRPC  = 'GRPC';  // POST application/json
+
+var RANDOM_DB  = 'RANDOM_DB';
+var RANDOM_IN  = 'RANDOM_IN';
+var RANDOM_INT = 'RANDOM_INT';
+var RANDOM_NUM = 'RANDOM_NUM';
+var RANDOM_STR = 'RANDOM_STR';
+
+var ORDER_DB  = 'ORDER_DB';
+var ORDER_IN  = 'ORDER_IN';
+var ORDER_INT = 'ORDER_INT';
+
+var ORDER_MAP: NullableType<IndexedObj> = {};
+
+function randomInt(min?: number, max?: number) {
+  return randomNum(min, max, 0);
+}
+
+function randomStr(minLength: unknown, maxLength: unknown, availableChars: unknown) {
+  return 'Ab_Cd' + randomNum();
+}
+
+function randomNum(min?: number, max?: number, precision?: number) {
+  // 0 居然也会转成  Number.MIN_SAFE_INTEGER ！！！
+  // start = start || Number.MIN_SAFE_INTEGER
+  // end = end || Number.MAX_SAFE_INTEGER
+
+  if (min == null) {
+    min = Number.MIN_SAFE_INTEGER;
+  }
+  if (max == null) {
+    max = Number.MAX_SAFE_INTEGER;
+  }
+  if (precision == null) {
+    precision = 2;
+  }
+
+  return +((max - min) * Math.random() + min).toFixed(precision);
+}
+
+function randomIn(...args: Array<any>) {
+  return (args == null || args.length <= 0)
+      ? null
+      : args[randomInt(0, args.length - 1)];
+}
+
+function orderInt(
+    desc: boolean,                  // 是否逆序
+    index: number, min?: number, max?: number,
+) {
+  if (min == null) {
+    min = Number.MIN_SAFE_INTEGER;
+  }
+  if (max == null) {
+    max = Number.MAX_SAFE_INTEGER;
+  }
+
+  if (desc) {
+    return max - index % (max - min + 1);
+  }
+  return min + index % (max - min + 1);
+}
+
+function orderIn(
+    desc: boolean,                  // 是否逆序
+    index: UndefinedAbleType<number>, ...args: Array<any>) {
+  // alert('orderIn  index = ' + index + '; args = ' + JSON.stringify(args));
+  index = index || 0;
+  return (args == null || args.length <= index)
+      ? null
+      : args[
+          desc
+              ? args.length - index
+              : index
+          ];
+}
+
+function getOrderIndex(
+    randomId: NullableType<number>,
+    line: string | number,
+    argCount: NullableType<number>,
+) {
+  // alert('randomId = ' + randomId + '; line = ' + line + '; argCount = ' + argCount);
+  // alert('ORDER_MAP = ' + JSON.stringify(ORDER_MAP, null, '  '));
+
+  if (randomId == null) {
+    randomId = 0;
+  }
+  if (ORDER_MAP == null) {
+    ORDER_MAP = {};
+  }
+  if (ORDER_MAP[randomId] == null) {
+    ORDER_MAP[randomId] = {};
+  }
+
+  var orderIndex = ORDER_MAP[randomId][line];
+  // alert('orderIndex = ' + orderIndex)
+
+  if (orderIndex == null || orderIndex < -1) {
+    orderIndex = -1;
+  }
+
+  orderIndex++;
+  orderIndex                = argCount == null || argCount <= 0 ? orderIndex : orderIndex % argCount;
+  ORDER_MAP[randomId][line] = orderIndex;
+
+  // alert('orderIndex = ' + orderIndex)
+  // alert('ORDER_MAP = ' + JSON.stringify(ORDER_MAP, null, '  '));
+  return orderIndex;
+}
+
 
 export default Vue.extend({
   name      : 'main',
@@ -682,7 +839,9 @@ export default Vue.extend({
       randomSubCount     : 50,
       randomSubSearch    : '',
 
-      StringUtil: window.StringUtil,
+    //
+
+      isSyncing:false,
     };
   },
   computed  : {
@@ -699,7 +858,7 @@ export default Vue.extend({
   },
   watch     : {
     jsoncon: function () {
-      App.showJsonView();
+      this.showJsonView();
     }
   },
   created() {
@@ -710,15 +869,15 @@ export default Vue.extend({
       }
       var database = this.getCache('', 'database');
       if (StringUtil.isEmpty(database, true) == false) {
-        this.database = CodeUtil.database = database;
+        this.database = CodeUtil.database = database || '';
       }
       var schema = this.getCache('', 'schema');
       if (StringUtil.isEmpty(schema, true) == false) {
-        this.schema = CodeUtil.schema = schema;
+        this.schema = CodeUtil.schema = schema || '';
       }
       var language = this.getCache('', 'language');
       if (StringUtil.isEmpty(language, true) == false) {
-        this.language = CodeUtil.language = language;
+        this.language = CodeUtil.language = language || '';
       }
       var types = this.getCache('', 'types');
       if (types != null && types.length > 0) {
@@ -795,7 +954,7 @@ export default Vue.extend({
 
     // 全部展开
     expandAll: function () {
-      if (App.view != 'code') {
+      if (this.view != 'code') {
         alert('请先获取正确的JSON Response！');
         return;
       }
@@ -805,12 +964,12 @@ export default Vue.extend({
       $('.expand-view').show();
       $('.fold-view').hide();
 
-      App.isExpand = true;
+      this.isExpand = true;
     },
 
     // 全部折叠
     collapseAll: function () {
-      if (App.view != 'code') {
+      if (this.view != 'code') {
         alert('请先获取正确的JSON Response！');
         return;
       }
@@ -820,29 +979,29 @@ export default Vue.extend({
       $('.expand-view').hide();
       $('.fold-view').show();
 
-      App.isExpand = false;
+      this.isExpand = false;
     },
 
     // diff
     diffTwo: function () {
       var oldJSON = {};
       var newJSON = {};
-      App.view    = 'code';
+      this.view   = 'code';
       try {
-        oldJSON = jsonlint.parse(App.jsoncon);
+        oldJSON = jsonlint.parse(this.jsoncon);
       } catch (ex) {
-        App.view  = 'error';
-        App.error = {
+        this.view  = 'error';
+        this.error = {
           msg: '原 JSON 解析错误\r\n' + ex.message
         };
         return;
       }
 
       try {
-        newJSON = jsonlint.parse(App.jsoncon);
+        newJSON = jsonlint.parse(this.jsoncon);
       } catch (ex) {
-        App.view  = 'error';
-        App.error = {
+        this.view  = 'error';
+        this.error = {
           msg: '新 JSON 解析错误\r\n' + ex.message
         };
         return;
@@ -864,32 +1023,32 @@ export default Vue.extend({
     },
 
     baseViewToDiff: function () {
-      App.baseview = 'diff';
-      App.diffTwo();
+      this.baseview = 'diff';
+      this.diffTwo();
     },
 
     // 回到格式化视图
     baseViewToFormater: function () {
-      App.baseview = 'formater';
-      App.view     = 'code';
-      App.showJsonView();
+      this.baseview = 'formater';
+      this.view     = 'code';
+      this.showJsonView();
     },
 
     // 根据json内容变化格式化视图
     showJsonView: function () {
-      if (App.baseview === 'diff') {
+      if (this.baseview === 'diff') {
         return;
       }
       try {
         if (this.jsoncon.trim() === '') {
-          App.view = 'empty';
+          this.view = 'empty';
         } else {
-          App.view = 'code';
+          this.view = 'code';
 
           if (isSingle) {
-            App.jsonhtml = jsonlint.parse(this.jsoncon);
+            this.jsonhtml = jsonlint.parse(this.jsoncon);
           } else {
-            App.jsonhtml = Object.assign({
+            this.jsonhtml = Object.assign({
               _$_this_$_: JSON.stringify({
                 path : null,
                 table: null
@@ -899,8 +1058,8 @@ export default Vue.extend({
 
         }
       } catch (ex) {
-        App.view  = 'error';
-        App.error = {
+        this.view  = 'error';
+        this.error = {
           msg: ex.message
         };
       }
@@ -912,17 +1071,17 @@ export default Vue.extend({
         if (isAdminOperation != true) {
           baseUrl = this.getBaseUrl();
         }
-        vUrl.value = (isAdminOperation ? App.server : baseUrl) + branchUrl;
+        vUrl.value = (isAdminOperation ? this.server : baseUrl) + branchUrl;
       } else {  //隐藏(固定)URL Host
         if (isAdminOperation) {
-          this.host = App.server;
+          this.host = this.server;
         }
         vUrl.value = branchUrl;
       }
 
-      vUrlComment.value = isSingle || StringUtil.isEmpty(App.urlComment, true)
-          ? '' : vUrl.value + CodeUtil.getComment(App.urlComment, false, '  ')
-          + ' - ' + (App.requestVersion > 0 ? 'V' + App.requestVersion : 'V*');
+      vUrlComment.value = isSingle || StringUtil.isEmpty(this.urlComment, true)
+          ? '' : vUrl.value + CodeUtil.getComment(this.urlComment, false, '  ')
+          + ' - ' + (this.requestVersion > 0 ? 'V' + this.requestVersion : 'V*');
     },
 
     //设置基地址
@@ -942,7 +1101,7 @@ export default Vue.extend({
         // this.remotes = []
 
         // var index = baseUrl.indexOf(':') //http://localhost:8080
-        // App.server = (index < 0 ? baseUrl : baseUrl.substring(0, baseUrl)) + ':9090'
+        // this.server = (index < 0 ? baseUrl : baseUrl.substring(0, baseUrl)) + ':9090'
 
       }
     },
@@ -987,7 +1146,7 @@ export default Vue.extend({
     },
 
     getRequest: function (json, defaultValue) {
-      var s = App.toDoubleJSON(json, defaultValue);
+      var s = this.toDoubleJSON(json, defaultValue);
       if (StringUtil.isEmpty(s, true)) {
         return defaultValue;
       }
@@ -995,8 +1154,8 @@ export default Vue.extend({
         return jsonlint.parse(s);
       } catch (e) {
         log('main.getRequest', 'try { return jsonlint.parse(s); \n } catch (e) {\n' + e.message);
-        log('main.getRequest', 'return jsonlint.parse(App.removeComment(s));');
-        return jsonlint.parse(App.removeComment(s));
+        log('main.getRequest', 'return jsonlint.parse(this.removeComment(s));');
+        return jsonlint.parse(this.removeComment(s));
       }
     },
     getHeader : function (text) {
@@ -1028,7 +1187,7 @@ export default Vue.extend({
             try {
               val = eval(val);
             } catch (e) {
-              App.log('getHeader  if (hs != null && hs.length > 0) { ... if (ind > 0 && val.indexOf(\')\') > ind) { ... try { val = eval(val) } catch (e) = ' + e.message);
+              this.log('getHeader  if (hs != null && hs.length > 0) { ... if (ind > 0 && val.indexOf(\')\') > ind) { ... try { val = eval(val) } catch (e) = ' + e.message);
             }
           }
 
@@ -1042,42 +1201,42 @@ export default Vue.extend({
     // 显示保存弹窗
     showSave: function (show) {
       if (show) {
-        if (App.isTestCaseShow) {
+        if (this.isTestCaseShow) {
           alert('请先输入请求内容！');
           return;
         }
 
-        var tag          = App.getTag();
-        App.history.name = App.getMethod() + (StringUtil.isEmpty(tag, true) ? '' : ' ' + tag) + ' ' + App.formatTime(); //不自定义名称的都是临时的，不需要时间太详细
+        var tag           = this.getTag();
+        this.history.name = this.getMethod() + (StringUtil.isEmpty(tag, true) ? '' : ' ' + tag) + ' ' + this.formatTime(); //不自定义名称的都是临时的，不需要时间太详细
       }
-      App.isSaveShow = show;
+      this.isSaveShow = show;
     },
 
     // 显示导出弹窗
     showExport: function (show, isRemote, isRandom) {
       if (show) {
         if (isRemote) { //共享测试用例
-          App.isExportRandom = isRandom;
-          if (App.isTestCaseShow) {
+          this.isExportRandom = isRandom;
+          if (this.isTestCaseShow) {
             alert('请先输入请求内容！');
             return;
           }
-          if (App.view != 'code') {
+          if (this.view != 'code') {
             alert('请先测试请求，确保是正确可用的！');
             return;
           }
           if (isRandom) {
-            App.exTxt.name = '随机配置 ' + App.formatDateTime();
+            this.exTxt.name = '随机配置 ' + this.formatDateTime();
           } else {
-            var tag        = App.getTag();
-            App.exTxt.name = App.getMethod() + (StringUtil.isEmpty(tag, true) ? '' : ' ' + tag);
+            var tag         = this.getTag();
+            this.exTxt.name = this.getMethod() + (StringUtil.isEmpty(tag, true) ? '' : ' ' + tag);
           }
         } else { //下载到本地
-          if (App.isTestCaseShow) { //文档
-            App.exTxt.name = 'APIJSON自动化文档 ' + App.formatDateTime();
-          } else if (App.view == 'markdown' || App.view == 'output') {
+          if (this.isTestCaseShow) { //文档
+            this.exTxt.name = 'APIJSON自动化文档 ' + this.formatDateTime();
+          } else if (this.view == 'markdown' || this.view == 'output') {
             var suffix;
-            switch (App.language) {
+            switch (this.language) {
               case CodeUtil.LANGUAGE_KOTLIN:
                 suffix = '.kt';
                 break;
@@ -1120,31 +1279,31 @@ export default Vue.extend({
                 break;
             }
 
-            App.exTxt.name = 'User' + suffix;
+            this.exTxt.name = 'User' + suffix;
             alert('自动生成模型代码，可填类名后缀:\n'
                 + 'Kotlin.kt, Java.java, Swift.swift, Objective-C.m, C#.cs, Go.go,'
                 + '\nTypeScript.ts, JavaScript.js, PHP.php, Python.py, C++.cpp');
           } else {
-            App.exTxt.name = 'APIJSON测试 ' + App.getMethod() + ' ' + App.formatDateTime();
+            this.exTxt.name = 'APIJSON测试 ' + this.getMethod() + ' ' + this.formatDateTime();
           }
         }
       }
-      App.isExportShow   = show;
-      App.isExportRemote = isRemote;
+      this.isExportShow   = show;
+      this.isExportRemote = isRemote;
     },
 
     // 显示配置弹窗
     showConfig: function (show, index) {
-      App.isConfigShow = false;
-      if (App.isTestCaseShow) {
+      this.isConfigShow = false;
+      if (this.isTestCaseShow) {
         if (index == 3 || index == 4 || index == 5 || index == 10) {
-          App.showTestCase(false, false);
+          this.showTestCase(false, false);
         }
       }
 
       if (show) {
-        App.exTxt.button = index == 8 ? '上传' : '切换';
-        App.exTxt.index  = index;
+        this.exTxt.button = index == 8 ? '上传' : '切换';
+        this.exTxt.index  = index;
         switch (index) {
           case 0:
           case 1:
@@ -1152,9 +1311,9 @@ export default Vue.extend({
           case 6:
           case 7:
           case 8:
-            App.exTxt.name   = index == 0 ? App.database : (index == 1 ? App.schema : (index == 2
-                ? App.language : (index == 6 ? App.server : (index == 8 ? App.thirdParty : (App.types || []).join()))));
-            App.isConfigShow = true;
+            this.exTxt.name   = index == 0 ? this.database : (index == 1 ? this.schema : (index == 2
+                ? this.language : (index == 6 ? this.server : (index == 8 ? this.thirdParty : (this.types || []).join()))));
+            this.isConfigShow = true;
 
             if (index == 0) {
               alert('可填数据库:\nMYSQL,POSTGRESQL,SQLSERVER,ORACLE,DB2,SQLITE');
@@ -1166,11 +1325,11 @@ export default Vue.extend({
               alert('例如：\nSWAGGER http://apijson.cn:8080/v2/api-docs\nSWAGGER /v2/api-docs  // 省略 Host\nSWAGGER /  // 省略 Host 和 分支 URL\nRAP /repository/joined /repository/get\nYAPI /api/interface/list_menu /api/interface/get');
 
               try {
-                App.getThirdPartyApiList(this.thirdParty, function (platform, docUrl, listUrl, itemUrl, url_, res, err) {
+                this.getThirdPartyApiList(this.thirdParty, (platform, docUrl, listUrl, itemUrl, url_, res, err) => {
                   CodeUtil.thirdParty = platform;
-                  App.onResponse(url_, res, err);
+                  this.onResponse(url_, res, err);
                   return false;
-                }, function (platform, docUrl, listUrl, itemUrl, url_, res, err) {
+                }, (platform, docUrl, listUrl, itemUrl, url_, res, err) => {
                   var data   = (res || {}).data;
                   var apiMap = CodeUtil.thirdPartyApiMap || {};
 
@@ -1181,7 +1340,7 @@ export default Vue.extend({
                   } else if (platform == PLATFORM_RAP) {
                   } else if (platform == PLATFORM_YAPI) {
                     var api          = (data || {}).data;
-                    var typeAndParam = App.parseYApiTypeAndParam(api);
+                    var typeAndParam = this.parseYApiTypeAndParam(api);
                     api              = api || {};
                     var url          = api.path;
 
@@ -1206,38 +1365,38 @@ export default Vue.extend({
             }
             break;
           case 3:
-            App.host = App.getBaseUrl();
-            App.showUrl(false, new String(vUrl.value).substring(App.host.length)); //没必要导致必须重新获取 Response，App.onChange(false)
+            this.host = this.getBaseUrl();
+            this.showUrl(false, new String(vUrl.value).substring(this.host.length)); //没必要导致必须重新获取 Response，this.onChange(false)
             break;
           case 4:
-            App.isHeaderShow = show;
-            App.saveCache('', 'isHeaderShow', show);
+            this.isHeaderShow = show;
+            this.saveCache('', 'isHeaderShow', show);
             break;
           case 5:
-            App.isRandomShow = show;
-            App.saveCache('', 'isRandomShow', show);
+            this.isRandomShow = show;
+            this.saveCache('', 'isRandomShow', show);
             break;
           case 9:
-            App.isDelegateEnabled = show;
-            App.saveCache('', 'isDelegateEnabled', show);
+            this.isDelegateEnabled = show;
+            this.saveCache('', 'isDelegateEnabled', show);
             break;
         }
       } else if (index == 3) {
-        var host   = StringUtil.get(App.host);
+        var host   = StringUtil.get(this.host);
         var branch = new String(vUrl.value);
-        App.host   = '';
-        vUrl.value = host + branch; //保证 showUrl 里拿到的 baseUrl = App.host (http://apijson.cn:8080/put /balance)
-        App.setBaseUrl(); //保证自动化测试等拿到的 baseUrl 是最新的
-        App.showUrl(false, branch); //没必要导致必须重新获取 Response，App.onChange(false)
+        this.host  = '';
+        vUrl.value = host + branch; //保证 showUrl 里拿到的 baseUrl = this.host (http://apijson.cn:8080/put /balance)
+        this.setBaseUrl(); //保证自动化测试等拿到的 baseUrl 是最新的
+        this.showUrl(false, branch); //没必要导致必须重新获取 Response，this.onChange(false)
       } else if (index == 4) {
-        App.isHeaderShow = show;
-        App.saveCache('', 'isHeaderShow', show);
+        this.isHeaderShow = show;
+        this.saveCache('', 'isHeaderShow', show);
       } else if (index == 5) {
-        App.isRandomShow = show;
-        App.saveCache('', 'isRandomShow', show);
+        this.isRandomShow = show;
+        this.saveCache('', 'isRandomShow', show);
       } else if (index == 9) {
-        App.isDelegateEnabled = show;
-        App.saveCache('', 'isDelegateEnabled', show);
+        this.isDelegateEnabled = show;
+        this.saveCache('', 'isDelegateEnabled', show);
       }
     },
 
@@ -1292,24 +1451,24 @@ export default Vue.extend({
         },
         'tag'     : 'Document'
       };
-      this.request(true, REQUEST_TYPE_JSON, url, req, {}, function (url, res, err) {
-        App.onResponse(url, res, err);
+      this.request(true, REQUEST_TYPE_JSON, url, req, {}, (url, res, err) => {
+        this.onResponse(url, res, err);
 
         var rpObj = res.data || {};
 
         if (isDeleteRandom) {
           if (rpObj.Random != null && rpObj.Random.code == CODE_SUCCESS) {
             if (((item.Random || {}).toId || 0) <= 0) {
-              App.randoms.splice(item.index, 1);
+              this.randoms.splice(item.index, 1);
             } else {
-              App.randomSubs.splice(item.index, 1);
+              this.randomSubs.splice(item.index, 1);
             }
-            // App.showRandomList(true, App.currentRemoteItem)
+            // this.showRandomList(true, this.currentRemoteItem)
           }
         } else {
           if (rpObj.Document != null && rpObj.Document.code == CODE_SUCCESS) {
-            App.remotes.splice(item.index, 1);
-            App.showTestCase(true, App.isLocalShow);
+            this.remotes.splice(item.index, 1);
+            this.showTestCase(true, this.isLocalShow);
           }
         }
       });
@@ -1317,25 +1476,25 @@ export default Vue.extend({
 
     // 保存当前的JSON
     save: function () {
-      if (App.history.name.trim() === '') {
+      if (this.history.name.trim() === '') {
         Helper.alert('名称不能为空！', 'danger');
         return;
       }
       var val = {
-        name    : App.history.name,
-        type    : App.type,
+        name    : this.history.name,
+        type    : this.type,
         url     : '/' + this.getMethod(),
         request : inputted,
-        response: App.jsoncon,
+        response: this.jsoncon,
         header  : vHeader.value,
         random  : vRandom.value
       };
       var key = String(Date.now());
-      localforage.setItem(key, val, function (err, value) {
+      localforage.setItem(key, val, (err, value) => {
         Helper.alert('保存成功！', 'success');
-        App.showSave(false);
+        this.showSave(false);
         val.key = key;
-        App.historys.push(val);
+        this.historys.push(val);
       });
     },
 
@@ -1348,8 +1507,8 @@ export default Vue.extend({
     // 删除已保存的
     remove: function (item, index, isRemote, isRandom) {
       if (isRemote == null || isRemote == false) { //null != false
-        localforage.removeItem(item.key, function () {
-          App.historys.splice(index, 1);
+        localforage.removeItem(item.key, () => {
+          this.historys.splice(index, 1);
         });
       } else {
         if (this.isLocalShow) {
@@ -1378,8 +1537,8 @@ export default Vue.extend({
 
       var response = ((item || {}).TestRecord || {}).response;
       if (StringUtil.isEmpty(response, true) == false) {
-        App.jsoncon = StringUtil.trim(response);
-        App.view    = 'code';
+        this.jsoncon = StringUtil.trim(response);
+        this.view    = 'code';
       }
     },
     // 根据测试用例/历史记录恢复数据
@@ -1400,29 +1559,29 @@ export default Vue.extend({
         branch = '/' + branch;
       }
 
-      App.type           = item.type;
-      App.urlComment     = item.name;
-      App.requestVersion = item.version;
-      App.showUrl(false, branch);
+      this.type           = item.type;
+      this.urlComment     = item.name;
+      this.requestVersion = item.version;
+      this.showUrl(false, branch);
 
-      App.showTestCase(false, App.isLocalShow);
+      this.showTestCase(false, this.isLocalShow);
       vInput.value  = StringUtil.get(item.request);
       vHeader.value = StringUtil.get(item.header);
       vRandom.value = StringUtil.get(item.random);
-      App.onChange(false);
+      this.onChange(false);
 
       if (isRemote) {
-        App.randoms = [];
-        App.showRandomList(App.isRandomListShow, item);
+        this.randoms = [];
+        this.showRandomList(this.isRandomListShow, item);
       }
 
       if (test) {
-        App.send(false);
+        this.send(false);
       } else {
         if (StringUtil.isEmpty(response, true) == false) {
-          setTimeout(function () {
-            App.jsoncon = StringUtil.trim(response);
-            App.view    = 'code';
+          setTimeout(() => {
+            this.jsoncon = StringUtil.trim(response);
+            this.view    = 'code';
           }, 500);
         }
       }
@@ -1432,56 +1591,56 @@ export default Vue.extend({
 
     // 获取所有保存的json
     listHistory: function () {
-      localforage.iterate(function (value, key, iterationNumber) {
+      localforage.iterate( (value, key, iterationNumber) =>{
         if (key[0] !== '#') {
           value.key = key;
-          App.historys.push(value);
+          this.historys.push(value);
         }
         if (key === '#theme') {
           // 设置默认主题
-          App.checkedTheme = value;
+          this.checkedTheme = value;
         }
       });
     },
 
     // 导出文本
     exportTxt: function () {
-      App.isExportShow = false;
+      this.isExportShow = false;
 
-      if (App.isExportRemote == false) { //下载到本地
+      if (this.isExportRemote == false) { //下载到本地
 
-        if (App.isTestCaseShow) { //文档
-          saveTextAs('# ' + App.exTxt.name + '\n主页: https://github.com/Tencent/APIJSON'
+        if (this.isTestCaseShow) { //文档
+          saveTextAs('# ' + this.exTxt.name + '\n主页: https://github.com/Tencent/APIJSON'
               + '\n\nBASE_URL: ' + this.getBaseUrl()
-              + '\n\n\n## 测试用例(Markdown格式，可用工具预览) \n\n' + App.getDoc4TestCase()
+              + '\n\n\n## 测试用例(Markdown格式，可用工具预览) \n\n' + this.getDoc4TestCase()
               + '\n\n\n\n\n\n\n\n## 文档(Markdown格式，可用工具预览) \n\n' + doc
-              , App.exTxt.name + '.txt');
-        } else if (App.view == 'markdown' || App.view == 'output') { //model
-          var clazz = StringUtil.trim(App.exTxt.name);
+              , this.exTxt.name + '.txt');
+        } else if (this.view == 'markdown' || this.view == 'output') { //model
+          var clazz = StringUtil.trim(this.exTxt.name);
 
           var txt = ''; //配合下面 +=，实现注释判断，一次全生成，方便测试
           if (clazz.endsWith('.java')) {
-            txt += CodeUtil.parseJavaBean(docObj, clazz.substring(0, clazz.length - 5), App.database);
+            txt += CodeUtil.parseJavaBean(docObj, clazz.substring(0, clazz.length - 5), this.database);
           } else if (clazz.endsWith('.swift')) {
-            txt += CodeUtil.parseSwiftStruct(docObj, clazz.substring(0, clazz.length - 6), App.database);
+            txt += CodeUtil.parseSwiftStruct(docObj, clazz.substring(0, clazz.length - 6), this.database);
           } else if (clazz.endsWith('.kt')) {
-            txt += CodeUtil.parseKotlinDataClass(docObj, clazz.substring(0, clazz.length - 3), App.database);
+            txt += CodeUtil.parseKotlinDataClass(docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.m')) {
-            txt += CodeUtil.parseObjectiveCEntity(docObj, clazz.substring(0, clazz.length - 2), App.database);
+            txt += CodeUtil.parseObjectiveCEntity(docObj, clazz.substring(0, clazz.length - 2), this.database);
           } else if (clazz.endsWith('.cs')) {
-            txt += CodeUtil.parseCSharpEntity(docObj, clazz.substring(0, clazz.length - 3), App.database);
+            txt += CodeUtil.parseCSharpEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.php')) {
-            txt += CodeUtil.parsePHPEntity(docObj, clazz.substring(0, clazz.length - 4), App.database);
+            txt += CodeUtil.parsePHPEntity(docObj, clazz.substring(0, clazz.length - 4), this.database);
           } else if (clazz.endsWith('.go')) {
-            txt += CodeUtil.parseGoEntity(docObj, clazz.substring(0, clazz.length - 3), App.database);
+            txt += CodeUtil.parseGoEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.cpp')) {
-            txt += CodeUtil.parseCppStruct(docObj, clazz.substring(0, clazz.length - 4), App.database);
+            txt += CodeUtil.parseCppStruct(docObj, clazz.substring(0, clazz.length - 4), this.database);
           } else if (clazz.endsWith('.js')) {
-            txt += CodeUtil.parseJavaScriptEntity(docObj, clazz.substring(0, clazz.length - 3), App.database);
+            txt += CodeUtil.parseJavaScriptEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.ts')) {
-            txt += CodeUtil.parseTypeScriptEntity(docObj, clazz.substring(0, clazz.length - 3), App.database);
+            txt += CodeUtil.parseTypeScriptEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.py')) {
-            txt += CodeUtil.parsePythonEntity(docObj, clazz.substring(0, clazz.length - 3), App.database);
+            txt += CodeUtil.parsePythonEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else {
             alert('请正确输入对应语言的类名后缀！');
           }
@@ -1492,11 +1651,11 @@ export default Vue.extend({
           }
           saveTextAs(txt, clazz);
         } else {
-          var res = JSON.parse(App.jsoncon);
+          var res = JSON.parse(this.jsoncon);
           res     = this.removeDebugInfo(res);
 
           var s = '';
-          switch (App.language) {
+          switch (this.language) {
             case CodeUtil.LANGUAGE_KOTLIN:
               s += '(Kotlin):\n\n' + CodeUtil.parseKotlinResponse('', res, 0, false, !isSingle);
               break;
@@ -1539,52 +1698,52 @@ export default Vue.extend({
               break;
           }
 
-          saveTextAs('# ' + App.exTxt.name + '\n主页: https://github.com/Tencent/APIJSON'
+          saveTextAs('# ' + this.exTxt.name + '\n主页: https://github.com/Tencent/APIJSON'
               + '\n\n\nURL: ' + StringUtil.get(vUrl.value)
               + '\n\n\nHeader:\n' + StringUtil.get(vHeader.value)
               + '\n\n\nRequest:\n' + StringUtil.get(vInput.value)
-              + '\n\n\nResponse:\n' + StringUtil.get(App.jsoncon)
+              + '\n\n\nResponse:\n' + StringUtil.get(this.jsoncon)
               + '\n\n\n## 解析 Response 的代码' + s
-              , App.exTxt.name + '.txt');
+              , this.exTxt.name + '.txt');
         }
       } else { //上传到远程服务器
-        var id = App.User == null ? null : App.User.id;
+        var id = this.User == null ? null : this.User.id;
         if (id == null || id <= 0) {
           alert('请先登录！');
           return;
         }
-        var isExportRandom = App.isExportRandom;
-        var did            = ((App.currentRemoteItem || {}).Document || {}).id;
+        var isExportRandom = this.isExportRandom;
+        var did            = ((this.currentRemoteItem || {}).Document || {}).id;
         if (isExportRandom && did == null) {
           alert('请先共享测试用例！');
           return;
         }
 
-        App.isTestCaseShow = false;
+        this.isTestCaseShow = false;
 
-        var currentAccountId = App.getCurrentAccountId();
-        var currentResponse  = StringUtil.isEmpty(App.jsoncon, true) ? {} : App.removeDebugInfo(JSON.parse(App.jsoncon));
+        var currentAccountId = this.getCurrentAccountId();
+        var currentResponse  = StringUtil.isEmpty(this.jsoncon, true) ? {} : this.removeDebugInfo(JSON.parse(this.jsoncon));
 
         var code = currentResponse.code;
         var thrw = currentResponse.throw;
         delete currentResponse.code; //code必须一致
         delete currentResponse.throw; //throw必须一致
 
-        var isML              = App.isMLEnabled;
+        var isML              = this.isMLEnabled;
         var stddObj           = isML ? JSONResponse.updateStandard({}, currentResponse) : {};
         stddObj.code          = code;
         stddObj.throw         = thrw;
         currentResponse.code  = code;
         currentResponse.throw = thrw;
 
-        var url = App.server + '/post';
+        var url = this.server + '/post';
         var req = isExportRandom ? {
           format      : false,
           'Random'    : {
             toId      : 0,
             documentId: did,
-            count     : App.requestCount,
-            name      : App.exTxt.name,
+            count     : this.requestCount,
+            name      : this.exTxt.name,
             config    : vRandom.value
           },
           'TestRecord': {
@@ -1596,15 +1755,15 @@ export default Vue.extend({
           format      : false,
           'Document'  : {
             'testAccountId': currentAccountId,
-            'name'         : App.exTxt.name,
-            'type'         : App.type,
-            'url'          : '/' + App.getMethod(),
-            'request'      : App.toDoubleJSON(inputted),
+            'name'         : this.exTxt.name,
+            'type'         : this.type,
+            'url'          : '/' + this.getMethod(),
+            'request'      : this.toDoubleJSON(inputted),
             'header'       : vHeader.value
           },
           'TestRecord': {
             'randomId'     : 0,
-            'host'         : App.getBaseUrl(),
+            'host'         : this.getBaseUrl(),
             'testAccountId': currentAccountId,
             'response'     : JSON.stringify(currentResponse),
             'standard'     : isML ? JSON.stringify(stddObj) : null
@@ -1612,51 +1771,51 @@ export default Vue.extend({
           'tag'       : 'Document'
         };
 
-        App.request(true, REQUEST_TYPE_JSON, url, req, {}, function (url, res, err) {
-          App.onResponse(url, res, err);
+        this.request(true, REQUEST_TYPE_JSON, url, req, {},  (url, res, err) =>{
+          this.onResponse(url, res, err);
 
           var rpObj = res.data || {};
 
           if (isExportRandom) {
             if (rpObj.Random != null && rpObj.Random.code == CODE_SUCCESS) {
-              App.randoms = [];
-              App.showRandomList(true, (App.currentRemoteItem || {}).Document);
+              this.randoms = [];
+              this.showRandomList(true, (this.currentRemoteItem || {}).Document);
             }
           } else {
             if (rpObj.Document != null && rpObj.Document.code == CODE_SUCCESS) {
-              App.remotes = [];
-              App.showTestCase(true, false);
+              this.remotes = [];
+              this.showTestCase(true, false);
 
 
               //自动生成随机配置（遍历 JSON，对所有可变值生成配置，排除 @key, key@, key() 等固定值）
-              var req    = App.getRequest(vInput.value, {});
-              var config = StringUtil.trim(App.newRandomConfig(null, '', req));
+              var req    = this.getRequest(vInput.value, {});
+              var config = StringUtil.trim(this.newRandomConfig(null, '', req));
               if (config == '') {
                 return;
               }
 
-              App.request(true, REQUEST_TYPE_JSON, App.server + '/post', {
+              this.request(true, REQUEST_TYPE_JSON, this.server + '/post', {
                 format    : false,
                 'Random'  : {
                   documentId: rpObj.Document.id,
-                  count     : App.requestCount,
+                  count     : this.requestCount,
                   name      : '默认配置(上传测试用例时自动生成)',
                   config    : config
                 },
                 TestRecord: {
-                  host    : App.getBaseUrl(),
+                  host    : this.getBaseUrl(),
                   response: ''
                 },
                 'tag'     : 'Random'
-              }, {}, function (url, res, err) {
+              }, {},  (url, res, err) => {
                 if (res.data != null && res.data.Random != null && res.data.Random.code == CODE_SUCCESS) {
                   alert('已自动生成并上传随机配置:\n' + config);
-                  App.isRandomListShow = true;
+                  this.isRandomListShow = true;
                 } else {
                   alert('已自动生成，但上传以下随机配置失败:\n' + config);
                   vRandom.value = config;
                 }
-                App.onResponse(url, res, err);
+                this.onResponse(url, res, err);
               });
             }
           }
@@ -1718,7 +1877,7 @@ export default Vue.extend({
             }
           }
 
-          config += App.newRandomConfig(childPath, k, v);
+          config += this.newRandomConfig(childPath, k, v);
         }
       } else {
         //自定义关键词
@@ -1786,84 +1945,84 @@ export default Vue.extend({
 
     // 保存配置
     saveConfig: function () {
-      App.isConfigShow = App.exTxt.index == 8;
+      this.isConfigShow = this.exTxt.index == 8;
 
-      switch (App.exTxt.index) {
+      switch (this.exTxt.index) {
         case 0:
-          App.database = CodeUtil.database = App.exTxt.name;
-          App.saveCache('', 'database', App.database);
+          this.database = CodeUtil.database = this.exTxt.name;
+          this.saveCache('', 'database', this.database);
 
           doc             = null;
-          var item        = App.accounts[App.currentAccountIndex];
+          var item        = this.accounts[this.currentAccountIndex];
           item.isLoggedIn = false;
-          App.onClickAccount(App.currentAccountIndex, item);
+          this.onClickAccount(this.currentAccountIndex, item);
           break;
         case 1:
-          App.schema = CodeUtil.schema = App.exTxt.name;
-          App.saveCache('', 'schema', App.schema);
+          this.schema = CodeUtil.schema = this.exTxt.name;
+          this.saveCache('', 'schema', this.schema);
 
           doc             = null;
-          var item        = App.accounts[App.currentAccountIndex];
+          var item        = this.accounts[this.currentAccountIndex];
           item.isLoggedIn = false;
-          App.onClickAccount(App.currentAccountIndex, item);
+          this.onClickAccount(this.currentAccountIndex, item);
           break;
         case 2:
-          App.language = CodeUtil.language = App.exTxt.name;
-          App.saveCache('', 'language', App.language);
+          this.language = CodeUtil.language = this.exTxt.name;
+          this.saveCache('', 'language', this.language);
 
           doc = null;
-          App.onChange(false);
+          this.onChange(false);
           break;
         case 6:
-          App.server = App.exTxt.name;
-          App.saveCache('', 'server', App.server);
-          App.logout(true);
+          this.server = this.exTxt.name;
+          this.saveCache('', 'server', this.server);
+          this.logout(true);
           break;
         case 7:
-          App.types = StringUtil.split(App.exTxt.name);
-          App.saveCache('', 'types', App.types);
+          this.types = StringUtil.split(this.exTxt.name);
+          this.saveCache('', 'types', this.types);
           break;
         case 8:
-          App.getThirdPartyApiList(App.exTxt.name, function (platform, docUrl, listUrl, itemUrl, url_, res, err) {
+          this.getThirdPartyApiList(this.exTxt.name,  (platform, docUrl, listUrl, itemUrl, url_, res, err) => {
             var jsonData   = (res || {}).data;
             var isJSONData = jsonData instanceof Object;
             if (isJSONData == false) {  //后面是 URL 才存储；是 JSON 数据则不存储
-              App.thirdParty = thirdParty;
-              App.saveCache('', 'thirdParty', App.thirdParty);
+              this.thirdParty = thirdParty;
+              this.saveCache('', 'thirdParty', this.thirdParty);
             }
 
             if (platform == PLATFORM_POSTMAN) {
               alert('尚未开发 ' + PLATFORM_POSTMAN);
             } else if (platform == PLATFORM_SWAGGER) {
-              var swaggerCallback = function (url_, res, err) {
-                if (App.isSyncing) {
+              var swaggerCallback = (url_, res, err) => {
+                if (this.isSyncing) {
                   alert('正在同步，请等待完成');
                   return;
                 }
-                App.isSyncing = true;
-                App.onResponse(url_, res, err);
+                this.isSyncing = true;
+                this.onResponse(url_, res, err);
 
                 var apis = (res.data || {}).paths;
                 if (apis == null) { // || apis.length <= 0) {
-                  App.isSyncing = false;
+                  this.isSyncing = false;
                   alert('没有查到 Swagger 文档！请开启跨域代理，并检查 URL 是否正确！');
                   return;
                 }
-                App.exTxt.button = '...';
+                this.exTxt.button = '...';
 
-                App.uploadTotal     = 0; // apis.length || 0
-                App.uploadDoneCount = 0;
-                App.uploadFailCount = 0;
+                this.uploadTotal     = 0; // apis.length || 0
+                this.uploadDoneCount = 0;
+                this.uploadFailCount = 0;
 
                 var item;
                 // var i = 0
                 for (var url in apis) {
                   item = apis[url];
                   //导致 url 全都是一样的  setTimeout(function () {
-                  if (App.uploadSwaggerApi(url, item, 'get')
-                      || App.uploadSwaggerApi(url, item, 'post')
-                      || App.uploadSwaggerApi(url, item, 'put')
-                      || App.uploadSwaggerApi(url, item, 'delete')
+                  if (this.uploadSwaggerApi(url, item, 'get')
+                      || this.uploadSwaggerApi(url, item, 'post')
+                      || this.uploadSwaggerApi(url, item, 'put')
+                      || this.uploadSwaggerApi(url, item, 'delete')
                   ) {
                   }
                   // }, 100*i)
@@ -1874,14 +2033,14 @@ export default Vue.extend({
               if (isJSONData) {
                 swaggerCallback(docUrl, {data: jsonData}, null);
               } else {
-                App.request(false, REQUEST_TYPE_PARAM, docUrl, {}, {}, swaggerCallback);
+                this.request(false, REQUEST_TYPE_PARAM, docUrl, {}, {}, swaggerCallback);
               }
             } else if (platform == PLATFORM_RAP || platform == PLATFORM_YAPI) {
               var isRap = platform == PLATFORM_RAP;
 
-              var itemCallback = function (url, res, err) {
+              var itemCallback =  (url, res, err) => {
                 try {
-                  App.onResponse(url, res, err);
+                  this.onResponse(url, res, err);
                 } catch (e) {
                 }
 
@@ -1894,37 +2053,37 @@ export default Vue.extend({
                       var interfaces = it.interfaces || [];
 
                       for (var j = 0; j < interfaces.length; j++) {
-                        App.uploadRapApi(interfaces[j]);
+                        this.uploadRapApi(interfaces[j]);
                       }
                     }
                   }
                 } else {
-                  App.uploadYApi(data);
+                  this.uploadYApi(data);
                 }
               };
 
               if (isJSONData) {
                 itemCallback(itemUrl, {data: jsonData}, null);
               } else {
-                App.request(false, REQUEST_TYPE_PARAM, listUrl, {}, {}, function (url_, res, err) {
-                  if (App.isSyncing) {
+                this.request(false, REQUEST_TYPE_PARAM, listUrl, {}, {},  (url_, res, err) => {
+                  if (this.isSyncing) {
                     alert('正在同步，请等待完成');
                     return;
                   }
-                  App.isSyncing = true;
-                  App.onResponse(url_, res, err);
+                  this.isSyncing = true;
+                  this.onResponse(url_, res, err);
 
                   var apis = (res.data || {}).data;
                   if (apis == null) { // || apis.length <= 0) {
-                    App.isSyncing = false;
+                    this.isSyncing = false;
                     alert('没有查到 ' + (isRap ? 'Rap' : 'YApi') + ' 文档！请开启跨域代理，并检查 URL 是否正确！');
                     return;
                   }
-                  App.exTxt.button = '...';
+                  this.exTxt.button = '...';
 
-                  App.uploadTotal     = 0; // apis.length || 0
-                  App.uploadDoneCount = 0;
-                  App.uploadFailCount = 0;
+                  this.uploadTotal     = 0; // apis.length || 0
+                  this.uploadDoneCount = 0;
+                  this.uploadFailCount = 0;
 
                   var item;
                   for (var url in apis) {
@@ -1934,11 +2093,11 @@ export default Vue.extend({
                     for (let i1 = 0; i1 < list.length; i1++) {
                       var listItem1 = list[i1];
                       if (listItem1 == null || listItem1._id == null) {
-                        App.log('listItem1 == null || listItem1._id == null >> continue');
+                        this.log('listItem1 == null || listItem1._id == null >> continue');
                         continue;
                       }
 
-                      App.request(false, REQUEST_TYPE_PARAM, itemUrl + '?id=' + listItem1._id, {}, {}, itemCallback);
+                      this.request(false, REQUEST_TYPE_PARAM, itemUrl + '?id=' + listItem1._id, {}, {}, itemCallback);
                     }
 
                   }
@@ -1957,8 +2116,8 @@ export default Vue.extend({
       }
     },
 
-    getThirdPartyApiList: function (thirdParty, listCallback, itemCallback) {
-      App.parseThirdParty(thirdParty, function (platform, jsonData, docUrl, listUrl, itemUrl) {
+    getThirdPartyApiList: function (thirdParty, listCallback, itemCallback?:Function) {
+      this.parseThirdParty(thirdParty, (platform, jsonData, docUrl, listUrl, itemUrl) => {
         var isJSONData = jsonData instanceof Object;
 
         if (platform == PLATFORM_POSTMAN) {
@@ -1967,7 +2126,7 @@ export default Vue.extend({
           if (isJSONData) {
             listCallback(platform, docUrl, listUrl, itemUrl, itemUrl, {data: jsonData}, null);
           } else {
-            App.request(false, REQUEST_TYPE_PARAM, docUrl, {}, {}, function (url_, res, err) {
+            this.request(false, REQUEST_TYPE_PARAM, docUrl, {}, {}, function (url_, res, err) {
               if (listCallback != null) {
                 listCallback(platform, docUrl, listUrl, itemUrl, url_, res, err);
               }
@@ -1985,7 +2144,7 @@ export default Vue.extend({
               itemCallback(platform, docUrl, listUrl, itemUrl, itemUrl, {data: jsonData}, null);
             }
           } else {
-            App.request(false, REQUEST_TYPE_PARAM, listUrl, {}, {}, function (url_, res, err) {
+            this.request(false, REQUEST_TYPE_PARAM, listUrl, {}, {}, (url_, res, err) => {
               if (listCallback != null && listCallback(platform, docUrl, listUrl, itemUrl, url_, res, err)) {
                 return;
               }
@@ -2004,11 +2163,11 @@ export default Vue.extend({
                 for (let i1 = 0; i1 < list.length; i1++) {
                   var listItem1 = list[i1];
                   if (listItem1 == null || listItem1._id == null) {
-                    App.log('listItem1 == null || listItem1._id == null >> continue');
+                    this.log('listItem1 == null || listItem1._id == null >> continue');
                     continue;
                   }
 
-                  App.request(false, REQUEST_TYPE_PARAM, itemUrl + '?id=' + listItem1._id, {}, {}, function (url_, res, err) {
+                  this.request(false, REQUEST_TYPE_PARAM, itemUrl + '?id=' + listItem1._id, {}, {}, function (url_, res, err) {
                     if (itemCallback != null) {
                       itemCallback(platform, docUrl, listUrl, itemUrl, url_, res, err);
                     }
@@ -2039,7 +2198,7 @@ export default Vue.extend({
       } catch (e) {
       }
 
-      var host    = App.getBaseUrl();
+      var host    = this.getBaseUrl();
       var listUrl = null;
       var itemUrl = null;
 
@@ -2078,11 +2237,11 @@ export default Vue.extend({
       var api = docItem == null ? null : docItem[method];
       if (api == null) {
         log('postApi', 'api == null  >> return');
-        App.exTxt.button = 'All:' + App.uploadTotal + '\nDone:' + App.uploadDoneCount + '\nFail:' + App.uploadFailCount;
+        this.exTxt.button = 'All:' + this.uploadTotal + '\nDone:' + this.uploadDoneCount + '\nFail:' + this.uploadFailCount;
         return false;
       }
 
-      App.uploadTotal++;
+      this.uploadTotal++;
 
       var parameters  = api.parameters || [];
       var parameters2 = [];
@@ -2099,7 +2258,7 @@ export default Vue.extend({
         }
       }
 
-      return App.uploadThirdPartyApi(method == 'get' ? REQUEST_TYPE_PARAM : REQUEST_TYPE_JSON
+      return this.uploadThirdPartyApi(method == 'get' ? REQUEST_TYPE_PARAM : REQUEST_TYPE_JSON
           , api.summary, url, parameters2, api.headers, api.description);
     },
 
@@ -2111,11 +2270,11 @@ export default Vue.extend({
       var api = docItem;
       if (api == null) {
         log('postApi', 'api == null  >> return');
-        App.exTxt.button = 'All:' + App.uploadTotal + '\nDone:' + App.uploadDoneCount + '\nFail:' + App.uploadFailCount;
+        this.exTxt.button = 'All:' + this.uploadTotal + '\nDone:' + this.uploadDoneCount + '\nFail:' + this.uploadFailCount;
         return false;
       }
 
-      App.uploadTotal++;
+      this.uploadTotal++;
 
       var type;
       switch ((api.summary || {}).requestParamsType || '') {
@@ -2172,7 +2331,7 @@ export default Vue.extend({
         }
       }
 
-      return App.uploadThirdPartyApi(type, api.name, api.url, parameters2, header, api.description);
+      return this.uploadThirdPartyApi(type, api.name, api.url, parameters2, header, api.description);
     },
 
     /**上传 YApi
@@ -2182,11 +2341,11 @@ export default Vue.extend({
       var api = docItem;
       if (api == null) {
         log('postApi', 'api == null  >> return');
-        App.exTxt.button = 'All:' + App.uploadTotal + '\nDone:' + App.uploadDoneCount + '\nFail:' + App.uploadFailCount;
+        this.exTxt.button = 'All:' + this.uploadTotal + '\nDone:' + this.uploadDoneCount + '\nFail:' + this.uploadFailCount;
         return false;
       }
 
-      App.uploadTotal++;
+      this.uploadTotal++;
 
       var headers = api.req_headers || [];
       var header  = '';
@@ -2200,9 +2359,9 @@ export default Vue.extend({
             + (StringUtil.isEmpty(item.description, true) ? '' : '  // ' + item.description);
       }
 
-      var typeAndParam = App.parseYApiTypeAndParam(api);
+      var typeAndParam = this.parseYApiTypeAndParam(api);
 
-      return App.uploadThirdPartyApi(typeAndParam.type, api.title, api.path, typeAndParam.param, header
+      return this.uploadThirdPartyApi(typeAndParam.type, api.title, api.path, typeAndParam.param, header
           , StringUtil.isEmpty(api.markdown, true) ? api.description : api.markdown);
     },
 
@@ -2326,8 +2485,8 @@ export default Vue.extend({
       }
 
 
-      var currentAccountId = App.getCurrentAccountId();
-      App.request(true, REQUEST_TYPE_JSON, App.server + '/post', {
+      var currentAccountId = this.getCurrentAccountId();
+      this.request(true, REQUEST_TYPE_JSON, this.server + '/post', {
         format      : false,
         'Document'  : {
           'testAccountId': currentAccountId,
@@ -2339,26 +2498,26 @@ export default Vue.extend({
         },
         'TestRecord': {
           'randomId'     : 0,
-          'host'         : App.getBaseUrl(),
+          'host'         : this.getBaseUrl(),
           'testAccountId': currentAccountId,
           'response'     : ''
         },
         'tag'       : 'Document'
-      }, {}, function (url, res, err) {
-        //太卡 App.onResponse(url, res, err)
+      }, {},  (url, res, err) => {
+        //太卡 this.onResponse(url, res, err)
         if (res.data != null && res.data.Document != null && res.data.Document.code == CODE_SUCCESS) {
-          App.uploadDoneCount++;
+          this.uploadDoneCount++;
         } else {
-          App.uploadFailCount++;
+          this.uploadFailCount++;
         }
 
-        App.exTxt.button = 'All:' + App.uploadTotal + '\nDone:' + App.uploadDoneCount + '\nFail:' + App.uploadFailCount;
-        if (App.uploadDoneCount + App.uploadFailCount >= App.uploadTotal) {
+        this.exTxt.button = 'All:' + this.uploadTotal + '\nDone:' + this.uploadDoneCount + '\nFail:' + this.uploadFailCount;
+        if (this.uploadDoneCount + this.uploadFailCount >= this.uploadTotal) {
           alert('导入完成');
-          App.isSyncing = false;
-          App.showTestCase(false, false);
-          App.remotes = [];
-          App.showTestCase(true, false);
+          this.isSyncing = false;
+          this.showTestCase(false, false);
+          this.remotes = [];
+          this.showTestCase(true, false);
         }
       });
 
@@ -2379,20 +2538,20 @@ export default Vue.extend({
       if (date == null) {
         date = new Date();
       }
-      return date.getFullYear() + '-' + App.fillZero(date.getMonth() + 1) + '-' + App.fillZero(date.getDate());
+      return date.getFullYear() + '-' + this.fillZero(date.getMonth() + 1) + '-' + this.fillZero(date.getDate());
     },
     //格式化时间
-    formatTime    : function (date) {
+    formatTime    : function (date?: Date) {
       if (date == null) {
         date = new Date();
       }
-      return App.fillZero(date.getHours()) + ':' + App.fillZero(date.getMinutes());
+      return this.fillZero(date.getHours()) + ':' + this.fillZero(date.getMinutes());
     },
-    formatDateTime: function (date) {
+    formatDateTime: function (date?: Date) {
       if (date == null) {
         date = new Date();
       }
-      return App.formatDate(date) + ' ' + App.formatTime(date);
+      return this.formatDate(date) + ' ' + this.formatTime(date);
     },
     //填充0
     fillZero      : function (num, n) {
@@ -2424,12 +2583,12 @@ export default Vue.extend({
 
           if (item.isLoggedIn) {
             //logout FIXME 没法自定义退出，浏览器默认根据url来管理session的
-            this.logout(false, function (url, res, err) {
-              App.onResponse(url, res, err);
+            this.logout(false,  (url, res, err) => {
+              this.onResponse(url, res, err);
 
               item.isLoggedIn = false;
-              App.saveCache(App.getBaseUrl(), 'currentAccountIndex', App.currentAccountIndex);
-              App.saveCache(App.getBaseUrl(), 'accounts', App.accounts);
+              this.saveCache(this.getBaseUrl(), 'currentAccountIndex', this.currentAccountIndex);
+              this.saveCache(this.getBaseUrl(), 'accounts', this.accounts);
 
               if (callback != null) {
                 callback(false, index, err);
@@ -2437,8 +2596,8 @@ export default Vue.extend({
             });
           } else {
             //login
-            this.login(false, function (url, res, err) {
-              App.onResponse(url, res, err);
+            this.login(false,  (url, res, err) => {
+              this.onResponse(url, res, err);
 
               var data = res.data || {};
               var user = data.code == CODE_SUCCESS ? data.user : null;
@@ -2451,8 +2610,8 @@ export default Vue.extend({
                 item.remember   = data.remember;
                 item.isLoggedIn = true;
 
-                App.saveCache(App.getBaseUrl(), 'currentAccountIndex', App.currentAccountIndex);
-                App.saveCache(App.getBaseUrl(), 'accounts', App.accounts);
+                this.saveCache(this.getBaseUrl(), 'currentAccountIndex', this.currentAccountIndex);
+                this.saveCache(this.getBaseUrl(), 'accounts', this.accounts);
 
                 if (callback != null) {
                   callback(true, index, err);
@@ -2488,21 +2647,21 @@ export default Vue.extend({
     },
 
     removeAccountTab: function () {
-      if (App.accounts.length <= 1) {
+      if (this.accounts.length <= 1) {
         alert('至少要 1 个测试账号！');
         return;
       }
 
-      App.accounts.splice(App.currentAccountIndex, 1);
-      if (App.currentAccountIndex >= App.accounts.length) {
-        App.currentAccountIndex = App.accounts.length - 1;
+      this.accounts.splice(this.currentAccountIndex, 1);
+      if (this.currentAccountIndex >= this.accounts.length) {
+        this.currentAccountIndex = this.accounts.length - 1;
       }
 
-      App.saveCache(App.getBaseUrl(), 'currentAccountIndex', App.currentAccountIndex);
-      App.saveCache(App.getBaseUrl(), 'accounts', App.accounts);
+      this.saveCache(this.getBaseUrl(), 'currentAccountIndex', this.currentAccountIndex);
+      this.saveCache(this.getBaseUrl(), 'accounts', this.accounts);
     },
     addAccountTab   : function () {
-      App.showLogin(true, false);
+      this.showLogin(true, false);
     },
 
 
@@ -2559,41 +2718,41 @@ export default Vue.extend({
             },
             'TestRecord': {
               'documentId@'  : '/Document/id',
-              'userId'       : App.User.id,
-              'testAccountId': App.getCurrentAccountId(),
+              'userId'       : this.User.id,
+              'testAccountId': this.getCurrentAccountId(),
               'randomId'     : 0,
               '@order'       : 'date-',
-              '@column'      : 'id,userId,documentId,response' + (App.isMLEnabled ? ',standard' : ''),
-              '@having'      : App.isMLEnabled ? 'length(standard)>2' : null  //用 MySQL 5.6   '@having': App.isMLEnabled ? 'json_length(standard)>0' : null
+              '@column'      : 'id,userId,documentId,response' + (this.isMLEnabled ? ',standard' : ''),
+              '@having'      : this.isMLEnabled ? 'length(standard)>2' : null  //用 MySQL 5.6   '@having': this.isMLEnabled ? 'json_length(standard)>0' : null
             }
           },
           '@role': 'LOGIN'
         };
 
-        App.onChange(false);
-        App.request(true, REQUEST_TYPE_JSON, url, req, {}, function (url, res, err) {
-          App.onResponse(url, res, err);
+        this.onChange(false);
+        this.request(true, REQUEST_TYPE_JSON, url, req, {}, (url, res, err) => {
+          this.onResponse(url, res, err);
 
           var rpObj = res.data;
 
           if (rpObj != null && rpObj.code === CODE_SUCCESS) {
-            App.isTestCaseShow = true;
-            App.isLocalShow    = false;
-            App.testCases      = App.remotes = rpObj['[]'];
-            vOutput.value      = show ? '' : (output || '');
-            App.showDoc();
+            this.isTestCaseShow = true;
+            this.isLocalShow    = false;
+            this.testCases      = this.remotes = rpObj['[]'];
+            vOutput.value       = show ? '' : (output || '');
+            this.showDoc();
 
-            //App.onChange(false)
+            //this.onChange(false)
           }
         });
       }
     },
 
     //显示远程的随机配置文档
-    showRandomList: function (show, item, isSub) {
+    showRandomList: function (show: boolean, item: null | IndexedObj, isSub?: boolean) {
       this.isRandomEditable    = false;
       this.isRandomListShow    = show && !isSub;
-      this.isRandomSubListShow = show && isSub;
+      this.isRandomSubListShow = !!(show && isSub);
       if (!isSub) {
         this.randomSubs = [];
       }
@@ -2611,7 +2770,7 @@ export default Vue.extend({
         var search    = isSub ? subSearch : (StringUtil.isEmpty(this.randomSearch, true)
             ? null : '%' + StringUtil.trim(this.randomSearch) + '%');
 
-        var url = App.server + '/get';
+        var url = this.server + '/get';
         var req = {
           '[]': {
             'count'     : (isSub ? this.randomSubCount : this.randomCount) || 100,
@@ -2624,8 +2783,8 @@ export default Vue.extend({
             },
             'TestRecord': {
               'randomId@'    : '/Random/id',
-              'testAccountId': App.getCurrentAccountId(),
-              'host'         : App.getBaseUrl(),
+              'testAccountId': this.getCurrentAccountId(),
+              'host'         : this.getBaseUrl(),
               '@order'       : 'date-'
             },
             '[]'        : isSub ? null : {
@@ -2639,8 +2798,8 @@ export default Vue.extend({
               },
               'TestRecord': {
                 'randomId@'    : '/Random/id',
-                'testAccountId': App.getCurrentAccountId(),
-                'host'         : App.getBaseUrl(),
+                'testAccountId': this.getCurrentAccountId(),
+                'host'         : this.getBaseUrl(),
                 '@order'       : 'date-'
               }
             }
@@ -2648,27 +2807,27 @@ export default Vue.extend({
         };
 
         this.onChange(false);
-        this.request(true, REQUEST_TYPE_JSON, url, req, {}, function (url, res, err) {
-          App.onResponse(url, res, err);
+        this.request(true, REQUEST_TYPE_JSON, url, req, {},  (url, res, err) => {
+          this.onResponse(url, res, err);
 
           var rpObj = res.data;
 
           if (rpObj != null && rpObj.code === CODE_SUCCESS) {
-            App.isRandomListShow    = !isSub;
-            App.isRandomSubListShow = isSub;
+            this.isRandomListShow    = !isSub;
+            this.isRandomSubListShow = isSub;
             if (isSub) {
-              if (App.currentRandomItem == null) {
-                App.currentRandomItem = {};
+              if (this.currentRandomItem == null) {
+                this.currentRandomItem = {};
               }
-              App.randomSubs = App.currentRandomItem.subs = App.currentRandomItem['[]'] = rpObj['[]'];
+              this.randomSubs = this.currentRandomItem.subs = this.currentRandomItem['[]'] = rpObj['[]'];
             } else {
-              App.randoms = rpObj['[]'];
+              this.randoms = rpObj['[]'];
             }
 
             vOutput.value = show ? '' : (output || '');
-            App.showDoc();
+            this.showDoc();
 
-            //App.onChange(false)
+            //this.onChange(false)
           }
         });
       }
@@ -2678,8 +2837,8 @@ export default Vue.extend({
     // 设置文档
     showDoc: function () {
       if (this.setDoc(doc) == false) {
-        this.getDoc(function (d) {
-          App.setDoc(d);
+        this.getDoc( (d) => {
+          this.setDoc(d);
         });
       }
     },
@@ -2695,7 +2854,7 @@ export default Vue.extend({
       try {
         cache = JSON.parse(cache);
       } catch (e) {
-        App.log('login  App.send >> try { cache = JSON.parse(cache) } catch(e) {\n' + e.message);
+        this.log('login  this.send >> try { cache = JSON.parse(cache) } catch(e) {\n' + e.message);
       }
       cache = cache || {};
       return key == null ? cache : cache[key];
@@ -2704,15 +2863,15 @@ export default Vue.extend({
     /**登录确认
      */
     confirm: function () {
-      switch (App.loginType) {
+      switch (this.loginType) {
         case 'login':
-          App.login(App.isAdminOperation);
+          this.login(this.isAdminOperation);
           break;
         case 'register':
-          App.register(App.isAdminOperation);
+          this.register(this.isAdminOperation);
           break;
         case 'forget':
-          App.resetPassword(App.isAdminOperation);
+          this.resetPassword(this.isAdminOperation);
           break;
       }
     },
@@ -2725,7 +2884,7 @@ export default Vue.extend({
         return;
       }
 
-      var user = isAdmin ? App.User : null;  // add account   App.accounts[App.currentAccountIndex]
+      var user = isAdmin ? this.User : null;  // add account   this.accounts[this.currentAccountIndex]
 
       // alert("showLogin  isAdmin = " + isAdmin + "; user = \n" + JSON.stringify(user, null, '    '))
 
@@ -2746,33 +2905,33 @@ export default Vue.extend({
     },
 
     getCurrentAccount  : function () {
-      return App.accounts == null ? null : App.accounts[App.currentAccountIndex];
+      return this.accounts == null ? null : this.accounts[this.currentAccountIndex];
     },
     getCurrentAccountId: function () {
-      var a = App.getCurrentAccount();
+      var a = this.getCurrentAccount();
       return a != null && a.isLoggedIn ? a.id : null;
     },
 
     /**登录
      */
     login: function (isAdminOperation, callback) {
-      App.isLoginShow = false;
+      this.isLoginShow = false;
 
       const req = {
         type    : 0, // 登录方式，非必须 0-密码 1-验证码
-        phone   : App.account,
-        password: App.password,
+        phone   : this.account,
+        password: this.password,
         version : 1, // 全局默认版本号，非必须
         remember: vRemember.checked,
         format  : false,
         defaults: {
-          '@database': App.database,
-          '@schema'  : App.schema
+          '@database': this.database,
+          '@schema'  : this.schema
         }
       };
 
       if (isAdminOperation) {
-        App.request(isAdminOperation, REQUEST_TYPE_JSON, App.server + '/login', req, {}, function (url, res, err) {
+        this.request(isAdminOperation, REQUEST_TYPE_JSON, this.server + '/login', req, {}, (url, res, err) => {
           if (callback) {
             callback(url, res, err);
             return;
@@ -2789,55 +2948,55 @@ export default Vue.extend({
               user.remember = rpObj.remember;
               user.phone    = req.phone;
               user.password = req.password;
-              App.User      = user;
+              this.User     = user;
             }
 
             //保存User到缓存
-            App.saveCache(App.server, 'User', user);
+            this.saveCache(this.server, 'User', user);
 
-            if (App.currentAccountIndex == null || App.currentAccountIndex < 0) {
-              App.currentAccountIndex = 0;
+            if (this.currentAccountIndex == null || this.currentAccountIndex < 0) {
+              this.currentAccountIndex = 0;
             }
-            var item        = App.accounts[App.currentAccountIndex];
+            var item        = this.accounts[this.currentAccountIndex];
             item.isLoggedIn = false;
-            App.onClickAccount(App.currentAccountIndex, item); //自动登录测试账号
+            this.onClickAccount(this.currentAccountIndex, item); //自动登录测试账号
           }
 
         });
       } else {
         if (callback == null) {
           var item;
-          for (var i in App.accounts) {
-            item = App.accounts[i];
+          for (var i in this.accounts) {
+            item = this.accounts[i];
             if (item != null && req.phone == item.phone) {
               alert(req.phone + ' 已在测试账号中！');
-              // App.currentAccountIndex = i
+              // this.currentAccountIndex = i
               item.remember = vRemember.checked;
-              App.onClickAccount(i, item);
+              this.onClickAccount(i, item);
               return;
             }
           }
         }
 
-        App.showUrl(isAdminOperation, '/login');
+        this.showUrl(isAdminOperation, '/login');
 
         vInput.value = JSON.stringify(req, null, '    ');
-        App.type     = REQUEST_TYPE_JSON;
-        App.showTestCase(false, App.isLocalShow);
-        App.onChange(false);
-        App.send(isAdminOperation, function (url, res, err) {
+        this.type    = REQUEST_TYPE_JSON;
+        this.showTestCase(false, this.isLocalShow);
+        this.onChange(false);
+        this.send(isAdminOperation, (url, res, err) => {
           if (callback) {
             callback(url, res, err);
             return;
           }
 
-          App.onResponse(url, res, err);
+          this.onResponse(url, res, err);
 
           //由login按钮触发，不能通过callback回调来实现以下功能
           var data = res.data || {};
           if (data.code == CODE_SUCCESS) {
             var user = data.user || {};
-            App.accounts.push({
+            this.accounts.push({
               isLoggedIn: true,
               id        : user.id,
               name      : user.name,
@@ -2846,15 +3005,15 @@ export default Vue.extend({
               remember  : data.remember
             });
 
-            var lastItem = App.accounts[App.currentAccountIndex];
+            var lastItem = this.accounts[this.currentAccountIndex];
             if (lastItem != null) {
               lastItem.isLoggedIn = false;
             }
 
-            App.currentAccountIndex = App.accounts.length - 1;
+            this.currentAccountIndex = this.accounts.length - 1;
 
-            App.saveCache(App.getBaseUrl(), 'currentAccountIndex', App.currentAccountIndex);
-            App.saveCache(App.getBaseUrl(), 'accounts', App.accounts);
+            this.saveCache(this.getBaseUrl(), 'currentAccountIndex', this.currentAccountIndex);
+            this.saveCache(this.getBaseUrl(), 'accounts', this.accounts);
           }
         });
       }
@@ -2863,12 +3022,12 @@ export default Vue.extend({
     /**注册
      */
     register: function (isAdminOperation) {
-      App.showUrl(isAdminOperation, '/register');
+      this.showUrl(isAdminOperation, '/register');
       vInput.value = JSON.stringify(
           {
             Privacy: {
-              phone    : App.account,
-              _password: App.password
+              phone    : this.account,
+              _password: this.password
             },
             User   : {
               name: 'APIJSONUser'
@@ -2876,10 +3035,10 @@ export default Vue.extend({
             verify : vVerify.value
           },
           null, '    ');
-      App.showTestCase(false, false);
-      App.onChange(false);
-      App.send(isAdminOperation, function (url, res, err) {
-        App.onResponse(url, res, err);
+      this.showTestCase(false, false);
+      this.onChange(false);
+      this.send(isAdminOperation, (url, res, err) => {
+        this.onResponse(url, res, err);
 
         var rpObj = res.data;
 
@@ -2888,8 +3047,8 @@ export default Vue.extend({
 
           var privacy = rpObj.Privacy || {};
 
-          App.account   = privacy.phone;
-          App.loginType = 'login';
+          this.account   = privacy.phone;
+          this.loginType = 'login';
         }
       });
     },
@@ -2897,20 +3056,20 @@ export default Vue.extend({
     /**重置密码
      */
     resetPassword: function (isAdminOperation) {
-      App.showUrl(isAdminOperation, '/put/password');
+      this.showUrl(isAdminOperation, '/put/password');
       vInput.value = JSON.stringify(
           {
             verify : vVerify.value,
             Privacy: {
-              phone    : App.account,
-              _password: App.password
+              phone    : this.account,
+              _password: this.password
             }
           },
           null, '    ');
-      App.showTestCase(false, App.isLocalShow);
-      App.onChange(false);
-      App.send(isAdminOperation, function (url, res, err) {
-        App.onResponse(url, res, err);
+      this.showTestCase(false, this.isLocalShow);
+      this.onChange(false);
+      this.send(isAdminOperation, (url, res, err) => {
+        this.onResponse(url, res, err);
 
         var rpObj = res.data;
 
@@ -2919,8 +3078,8 @@ export default Vue.extend({
 
           var privacy = rpObj.Privacy || {};
 
-          App.account   = privacy.phone;
-          App.loginType = 'login';
+          this.account   = privacy.phone;
+          this.loginType = 'login';
         }
       });
     },
@@ -2931,13 +3090,13 @@ export default Vue.extend({
       var req = {};
 
       if (isAdminOperation) {
-        // alert('logout  isAdminOperation  this.saveCache(App.server, User, {})')
-        this.saveCache(App.server, 'User', {});
+        // alert('logout  isAdminOperation  this.saveCache(this.server, User, {})')
+        this.saveCache(this.server, 'User', {});
       }
 
       // alert('logout  isAdminOperation = ' + isAdminOperation + '; url = ' + url)
       if (isAdminOperation) {
-        this.request(isAdminOperation, REQUEST_TYPE_JSON, App.server + '/logout', req, {}, function (url, res, err) {
+        this.request(isAdminOperation, REQUEST_TYPE_JSON, this.server + '/logout', req, {}, (url, res, err) => {
           if (callback) {
             callback(url, res, err);
             return;
@@ -2945,15 +3104,15 @@ export default Vue.extend({
 
           // alert('logout  clear admin ')
 
-          App.clearUser();
-          App.onResponse(url, res, err);
-          App.showTestCase(false, App.isLocalShow);
+          this.clearUser();
+          this.onResponse(url, res, err);
+          this.showTestCase(false, this.isLocalShow);
         });
       } else {
-        App.showUrl(isAdminOperation, '/logout');
+        this.showUrl(isAdminOperation, '/logout');
         vInput.value = JSON.stringify(req, null, '    ');
         this.type    = REQUEST_TYPE_JSON;
-        this.showTestCase(false, App.isLocalShow);
+        this.showTestCase(false, this.isLocalShow);
         this.onChange(false);
         this.send(isAdminOperation, callback);
       }
@@ -2962,18 +3121,18 @@ export default Vue.extend({
     /**获取验证码
      */
     getVerify: function (isAdminOperation) {
-      App.showUrl(isAdminOperation, '/post/verify');
-      var type     = App.loginType == 'login' ? 0 : (App.loginType == 'register' ? 1 : 2);
+      this.showUrl(isAdminOperation, '/post/verify');
+      var type     = this.loginType == 'login' ? 0 : (this.loginType == 'register' ? 1 : 2);
       vInput.value = JSON.stringify(
           {
             type : type,
-            phone: App.account
+            phone: this.account
           },
           null, '    ');
-      App.showTestCase(false, App.isLocalShow);
-      App.onChange(false);
-      App.send(isAdminOperation, function (url, res, err) {
-        App.onResponse(url, res, err);
+      this.showTestCase(false, this.isLocalShow);
+      this.onChange(false);
+      this.send(isAdminOperation, (url, res, err) => {
+        this.onResponse(url, res, err);
 
         var data   = res.data || {};
         var obj    = data.code == CODE_SUCCESS ? data.verify : null;
@@ -2985,10 +3144,10 @@ export default Vue.extend({
     },
 
     clearUser: function () {
-      App.User.id = 0;
-      App.Privacy = {};
-      App.remotes = [];
-      App.saveCache(App.server, 'User', App.User); //应该用lastBaseUrl,baseUrl应随watch输入变化重新获取
+      this.User.id = 0;
+      this.Privacy = {};
+      this.remotes = [];
+      this.saveCache(this.server, 'User', this.User); //应该用lastBaseUrl,baseUrl应随watch输入变化重新获取
     },
 
     /**计时回调
@@ -3000,7 +3159,7 @@ export default Vue.extend({
         return;
       }
 
-      App.view          = 'output';
+      this.view         = 'output';
       vComment.value    = '';
       vUrlComment.value = '';
       vOutput.value     = 'resolving...';
@@ -3015,7 +3174,7 @@ export default Vue.extend({
           throw new Error(e2.message);
         }
 
-        before = App.toDoubleJSON(StringUtil.trim(before));
+        before = this.toDoubleJSON(StringUtil.trim(before));
         log('onHandle  before = \n' + before);
 
         var afterObj;
@@ -3026,10 +3185,10 @@ export default Vue.extend({
           before   = after;
         } catch (e) {
           log('main.onHandle', 'try { return jsonlint.parse(before); \n } catch (e) {\n' + e.message);
-          log('main.onHandle', 'return jsonlint.parse(App.removeComment(before));');
+          log('main.onHandle', 'return jsonlint.parse(this.removeComment(before));');
 
           try {
-            afterObj = jsonlint.parse(App.removeComment(before));
+            afterObj = jsonlint.parse(this.removeComment(before));
             after    = JSON.stringify(afterObj, null, '    ');
           } catch (e2) {
             throw new Error('请求 JSON 格式错误！请检查并编辑请求！\n\n如果JSON中有注释，请 手动删除 或 点击左边的 \'/" 按钮 来去掉。\n\n' + e2.message);
@@ -3062,11 +3221,11 @@ export default Vue.extend({
         vOutput.value  = output = 'OK，请点击 [发送请求] 按钮来测试。[点击这里查看视频教程](http://i.youku.com/apijson)' + code;
 
 
-        App.showDoc();
+        this.showDoc();
 
         try {
-          var m = App.getMethod();
-          var c = isSingle ? '' : StringUtil.trim(CodeUtil.parseComment(after, docObj == null ? null : docObj['[]'], m, App.database, App.language, '/' + App.getMethod(), true))
+          var m = this.getMethod();
+          var c = isSingle ? '' : StringUtil.trim(CodeUtil.parseComment(after, docObj == null ? null : docObj['[]'], m, this.database, this.language, '/' + this.getMethod(), true))
               + '\n                                                                                                       '
               + '                                                                                                       \n';  //解决遮挡
           //TODO 统计行数，补全到一致 vInput.value.lineNumbers
@@ -3078,9 +3237,9 @@ export default Vue.extend({
             }
           }
           vComment.value    = c;
-          vUrlComment.value = isSingle || StringUtil.isEmpty(App.urlComment, true)
-              ? '' : vUrl.value + CodeUtil.getComment(App.urlComment, false, '  ')
-              + ' - ' + (App.requestVersion > 0 ? 'V' + App.requestVersion : 'V*');
+          vUrlComment.value = isSingle || StringUtil.isEmpty(this.urlComment, true)
+              ? '' : vUrl.value + CodeUtil.getComment(this.urlComment, false, '  ')
+              + ' - ' + (this.requestVersion > 0 ? 'V' + this.requestVersion : 'V*');
 
           onScrollChanged();
           onURLScrollChanged();
@@ -3091,8 +3250,8 @@ export default Vue.extend({
         log(e);
         vSend.disabled = true;
 
-        App.view  = 'error';
-        App.error = {
+        this.view  = 'error';
+        this.error = {
           msg: e.message
         };
       }
@@ -3111,8 +3270,8 @@ export default Vue.extend({
 
       this.isDelayShow = delay;
 
-      handler = window.setTimeout(function () {
-        App.onHandle(inputted);
+      handler = window.setTimeout( () => {
+        this.onHandle(inputted);
       }, delay ? 2 * 1000 : 0);
     },
 
@@ -3209,28 +3368,28 @@ export default Vue.extend({
     },
 
     showAndSend: function (branchUrl, req, isAdminOperation, callback) {
-      App.showUrl(isAdminOperation, branchUrl);
+      this.showUrl(isAdminOperation, branchUrl);
       vInput.value = JSON.stringify(req, null, '    ');
-      App.showTestCase(false, App.isLocalShow);
-      App.onChange(false);
-      App.send(isAdminOperation, callback);
+      this.showTestCase(false, this.isLocalShow);
+      this.onChange(false);
+      this.send(isAdminOperation, callback);
     },
 
     /**发送请求
      */
-    send: function (isAdminOperation, callback) {
+    send: function (isAdminOperation: boolean, callback?: Function) {
       if (this.isTestCaseShow) {
         alert('请先输入请求内容！');
         return;
       }
 
-      if (StringUtil.isEmpty(App.host, true)) {
+      if (StringUtil.isEmpty(this.host, true)) {
         if (StringUtil.get(vUrl.value).startsWith('http://') != true && StringUtil.get(vUrl.value).startsWith('https://') != true) {
           alert('URL 缺少 http:// 或 https:// 前缀，可能不完整或不合法，\n可能使用同域的 Host，很可能访问出错！');
         }
       } else {
         if (StringUtil.get(vUrl.value).indexOf('://') >= 0) {
-          alert('URL Host 已经隐藏(固定) 为 \n' + App.host + ' \n将会自动在前面补全，导致 URL 不合法访问出错！\n如果要改 Host，右上角设置 > 显示(编辑)URL Host');
+          alert('URL Host 已经隐藏(固定) 为 \n' + this.host + ' \n将会自动在前面补全，导致 URL 不合法访问出错！\n如果要改 Host，右上角设置 > 显示(编辑)URL Host');
         }
       }
 
@@ -3261,18 +3420,18 @@ export default Vue.extend({
       if (this.locals.length >= 1000) { //最多1000条，太多会很卡
         this.locals.splice(999, this.locals.length - 999);
       }
-      var method = App.getMethod();
+      var method = this.getMethod();
       this.locals.unshift({
         'Document': {
-          'userId' : App.User.id,
-          'name'   : App.formatDateTime() + (StringUtil.isEmpty(req.tag, true) ? '' : ' ' + req.tag),
-          'type'   : App.type,
+          'userId' : this.User.id,
+          'name'   : this.formatDateTime() + (StringUtil.isEmpty(req.tag, true) ? '' : ' ' + req.tag),
+          'type'   : this.type,
           'url'    : '/' + method,
           'request': JSON.stringify(req, null, '    '),
           'header' : vHeader.value
         }
       });
-      App.saveCache('', 'locals', this.locals);
+      this.saveCache('', 'locals', this.locals);
     },
 
     //请求
@@ -3298,7 +3457,7 @@ export default Vue.extend({
         withCredentials: true, //Cookie 必须要  type == REQUEST_TYPE_JSON
         // crossDomain: true
       })
-          .then(function (res) {
+          .then( (res) => {
             res = res || {};
             //any one of then callback throw error will cause it calls then(null)
             // if ((res.config || {}).method == 'options') {
@@ -3310,14 +3469,14 @@ export default Vue.extend({
             if (res.data != null && res.data.code == 407) {
               // alert('request res.data != null && res.data.code == 407 >> isAdminOperation = ' + isAdminOperation)
               if (isAdminOperation) {
-                // alert('request App.User = {} App.server = ' + App.server)
+                // alert('request this.User = {} this.server = ' + this.server)
 
-                App.clearUser();
+                this.clearUser();
               } else {
-                // alert('request App.accounts[App.currentAccountIndex].isLoggedIn = false ')
+                // alert('request this.accounts[this.currentAccountIndex].isLoggedIn = false ')
 
-                if (App.accounts[App.currentAccountIndex] != null) {
-                  App.accounts[App.currentAccountIndex].isLoggedIn = false;
+                if (this.accounts[this.currentAccountIndex] != null) {
+                  this.accounts[this.currentAccountIndex].isLoggedIn = false;
                 }
               }
             }
@@ -3326,15 +3485,15 @@ export default Vue.extend({
               callback(url, res, null);
               return;
             }
-            App.onResponse(url, res, null);
+            this.onResponse(url, res, null);
           })
-          .catch(function (err) {
+          .catch( (err) => {
             log('send >> error:\n' + err);
             if (callback != null) {
               callback(url, {}, err);
               return;
             }
-            App.onResponse(url, {}, err);
+            this.onResponse(url, {}, err);
           });
     },
 
@@ -3353,8 +3512,8 @@ export default Vue.extend({
         if (isSingle && data.code == CODE_SUCCESS) { //不格式化错误的结果
           data = JSONResponse.formatObject(data);
         }
-        App.jsoncon   = JSON.stringify(data, null, '    ');
-        App.view      = 'code';
+        this.jsoncon  = JSON.stringify(data, null, '    ');
+        this.view     = 'code';
         vOutput.value = '';
       }
     },
@@ -3392,7 +3551,7 @@ export default Vue.extend({
               name : r.name
             },
             tag   : 'Random'
-          }, {}, function (url, res, err) {
+          }, {},  (url, res, err) => {
 
             var isOk = (res.data || {}).code == CODE_SUCCESS;
 
@@ -3405,7 +3564,7 @@ export default Vue.extend({
                 + msg
             );
 
-            App.isRandomEditable = !isOk;
+            this.isRandomEditable = !isOk;
           });
 
           return;
@@ -3526,8 +3685,8 @@ export default Vue.extend({
           //虽然性能更好，但长时间没反应，用户会觉得未生效
           // this.getDoc(function (d) {
           //   // vOutput.value = 'resolving...';
-          //   App.setDoc(d)
-          //   App.onChange(false)
+          //   this.setDoc(d)
+          //   this.onChange(false)
           // });
           break;
       }
@@ -3538,20 +3697,20 @@ export default Vue.extend({
      */
     getCode: function (rq) {
       var s = '\n\n\n### 请求代码(自动生成) \n';
-      switch (App.language) {
+      switch (this.language) {
         case CodeUtil.LANGUAGE_KOTLIN:
           s += '\n#### <= Android-Kotlin: 空对象用 HashMap&lt;String, Any&gt;()，空数组用 ArrayList&lt;Any&gt;()\n'
               + '```kotlin \n'
-              + CodeUtil.parseKotlinRequest(null, JSON.parse(rq), 0, isSingle, false, false, App.type, App.getBaseUrl(), '/' + App.getMethod(), App.urlComment)
+              + CodeUtil.parseKotlinRequest(null, JSON.parse(rq), 0, isSingle, false, false, this.type, this.getBaseUrl(), '/' + this.getMethod(), this.urlComment)
               + '\n ``` \n注：对象 {} 用 mapOf("key": value)，数组 [] 用 listOf(value0, value1)\n';
           break;
         case CodeUtil.LANGUAGE_JAVA:
           s += '\n#### <= Android-Java: 同名变量需要重命名'
               + ' \n ```java \n'
-              + StringUtil.trim(CodeUtil.parseJavaRequest(null, JSON.parse(rq), 0, isSingle, false, false, App.type, '/' + App.getMethod(), App.urlComment))
+              + StringUtil.trim(CodeUtil.parseJavaRequest(null, JSON.parse(rq), 0, isSingle, false, false, this.type, '/' + this.getMethod(), this.urlComment))
               + '\n ``` \n注：' + (isSingle ? '用了 APIJSON 的 JSONRequest, JSONResponse 类，也可使用其它类封装，只要 JSON 有序就行\n' : 'LinkedHashMap&lt;&gt;() 可替换为 fastjson 的 JSONObject(true) 等有序JSON构造方法\n');
 
-          var serverCode = CodeUtil.parseJavaServer(App.type, '/' + App.getMethod(), App.database, App.schema, JSON.parse(rq), isSingle);
+          var serverCode = CodeUtil.parseJavaServer(this.type, '/' + this.getMethod(), this.database, this.schema, JSON.parse(rq), isSingle);
           if (StringUtil.isEmpty(serverCode, true) != true) {
             s += '\n#### <= Server-Java: RESTful 等非 APIJSON 规范的 API'
                 + ' \n ```java \n'
@@ -3652,7 +3811,7 @@ export default Vue.extend({
           + '<br>Copyright &copy; 2016-' + new Date().getFullYear() + ' Tommy Lemon<br><br></p>'
       );
 
-      App.view = 'markdown';
+      this.view = 'markdown';
       markdownToHTML(vOutput.value);
       return true;
     },
@@ -3667,9 +3826,9 @@ export default Vue.extend({
       var page  = this.page || 0;
 
       var search = StringUtil.isEmpty(this.search, true) ? null : '%' + StringUtil.trim(this.search) + '%';
-      App.request(false, REQUEST_TYPE_JSON, this.getBaseUrl() + '/get', {
+      this.request(false, REQUEST_TYPE_JSON, this.getBaseUrl() + '/get', {
         format      : false,
-        '@database' : App.database,
+        '@database' : this.database,
         'sql@'      : {
           'from'  : 'Access',
           'Access': {
@@ -3705,7 +3864,7 @@ export default Vue.extend({
           },
           'PgClass'         : this.database != 'POSTGRESQL' ? null : {
             'relname@': '/Table/table_name',
-            //FIXME  多个 schema 有同名表时数据总是取前面的  不属于 pg_class 表 'nspname': App.schema,
+            //FIXME  多个 schema 有同名表时数据总是取前面的  不属于 pg_class 表 'nspname': this.schema,
             '@column' : 'oid;obj_description(oid):table_comment'
           },
           'SysTable'        : this.database != 'SQLSERVER' ? null : {
@@ -3778,7 +3937,7 @@ export default Vue.extend({
             // '@combine': search == null ? null : 'tag$,detail$',
           }
         }
-      }, {}, function (url, res, err) {
+      }, {},  (url, res, err) => {
         if (err != null || res == null || res.data == null) {
           log('getDoc  err != null || res == null || res.data == null >> return;');
           callback('');
@@ -3807,7 +3966,7 @@ export default Vue.extend({
             item = list[i];
 
             //Table
-            table = item == null ? null : (App.database != 'SQLSERVER' ? item.Table : item.SysTable);
+            table = item == null ? null : (this.database != 'SQLSERVER' ? item.Table : item.SysTable);
             if (table == null) {
               continue;
             }
@@ -3815,9 +3974,9 @@ export default Vue.extend({
               log('getDoc [] for i=' + i + ': table = \n' + format(JSON.stringify(table)));
             }
 
-            var table_comment = App.database == 'POSTGRESQL'
+            var table_comment = this.database == 'POSTGRESQL'
                 ? (item.PgClass || {}).table_comment
-                : (App.database == 'SQLSERVER'
+                : (this.database == 'SQLSERVER'
                         ? (item.ExtendedProperty || {}).table_comment
                         : table.table_comment
                 );
@@ -3825,7 +3984,7 @@ export default Vue.extend({
             // item.Table.table_comment = table_comment
 
             doc += '### ' + (i + 1) + '. ' + CodeUtil.getModelName(table.table_name) + '\n#### 说明: \n'
-                + App.toMD(table_comment);
+                + this.toMD(table_comment);
 
 
             //Column[]
@@ -3850,24 +4009,24 @@ export default Vue.extend({
                 continue;
               }
 
-              column.column_type = CodeUtil.getColumnType(column, App.database);
-              type               = CodeUtil.getType4Language(App.language, column.column_type, false);
+              column.column_type = CodeUtil.getColumnType(column, this.database);
+              type               = CodeUtil.getType4Language(this.language, column.column_type, false);
               length             = CodeUtil.getMaxLength(column.column_type);
 
               if (DEBUG) {
                 log('getDoc [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
               }
 
-              var o              = App.database == 'POSTGRESQL'
+              var o              = this.database == 'POSTGRESQL'
                   ? (columnList[j] || {}).PgAttribute
-                  : (App.database == 'SQLSERVER'
+                  : (this.database == 'SQLSERVER'
                           ? (columnList[j] || {}).ExtendedProperty
                           : column
                   );
               var column_comment = (o || {}).column_comment;
 
               // column.column_comment = column_comment
-              doc += '\n' + name + '  |  ' + type + '  |  ' + length + '  |  ' + App.toMD(column_comment);
+              doc += '\n' + name + '  |  ' + type + '  |  ' + length + '  |  ' + this.toMD(column_comment);
 
             }
 
@@ -3969,7 +4128,7 @@ export default Vue.extend({
             }
 
             doc += '\n' + item.version + '  |  ' + item.method
-                + '  |  ' + JSON.stringify(App.getStructure(item.structure, item.tag));
+                + '  |  ' + JSON.stringify(this.getStructure(item.structure, item.tag));
           }
 
           doc += '\n注: \n1.GET,HEAD方法不受限，可传任何 数据、结构。\n2.可在最外层传版本version来指定使用的版本，不传或 version <= 0 则使用最新版。\n\n\n\n\n\n\n';
@@ -3978,7 +4137,7 @@ export default Vue.extend({
 
         //Request[] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-        App.onChange(false);
+        this.onChange(false);
 
 
         callback(doc);
@@ -4107,11 +4266,11 @@ export default Vue.extend({
     },
 
     log: function (msg) {
-      // App.log('Main.  ' + msg)
+      // this.log('Main.  ' + msg)
     },
 
     getDoc4TestCase: function () {
-      var list = App.remotes || [];
+      var list = this.remotes || [];
       var doc  = '';
       var item;
       for (var i = 0; i < list.length; i++) {
@@ -4128,13 +4287,13 @@ export default Vue.extend({
     enableCross: function (enable) {
       this.isCrossEnabled = enable;
       this.crossProcess   = enable ? '交叉账号:已开启' : '交叉账号:已关闭';
-      this.saveCache(App.server, 'isCrossEnabled', enable);
+      this.saveCache(this.server, 'isCrossEnabled', enable);
     },
 
     enableML: function (enable) {
       this.isMLEnabled = enable;
       this.testProcess = enable ? '机器学习:已开启' : '机器学习:已关闭';
-      this.saveCache(App.server, 'isMLEnabled', enable);
+      this.saveCache(this.server, 'isMLEnabled', enable);
       this.remotes = null;
       this.showTestCase(true, false);
     },
@@ -4200,18 +4359,18 @@ export default Vue.extend({
           const itemAllCount = random.count || 0;
           allCount += (itemAllCount - 1);
 
-          this.testRandomSingle(show, false, itemAllCount > 1 && !testSubList, item, this.type, url, json, header, function (url, res, err) {
+          this.testRandomSingle(show, false, itemAllCount > 1 && !testSubList, item, this.type, url, json, header,  (url, res, err) => {
 
             doneCount++;
-            App.testRandomProcess = doneCount >= allCount ? '' : ('正在测试: ' + doneCount + '/' + allCount);
+            this.testRandomProcess = doneCount >= allCount ? '' : ('正在测试: ' + doneCount + '/' + allCount);
             try {
-              App.onResponse(url, res, err);
-              App.log('test  App.request >> res.data = ' + JSON.stringify(res.data, null, '  '));
+              this.onResponse(url, res, err);
+              this.log('test  this.request >> res.data = ' + JSON.stringify(res.data, null, '  '));
             } catch (e) {
-              App.log('test  App.request >> } catch (e) {\n' + e.message);
+              this.log('test  this.request >> } catch (e) {\n' + e.message);
             }
 
-            App.compareResponse(allCount, list, index, item, res.data, true, App.currentAccountIndex, false, err);
+            this.compareResponse(allCount, list, index, item, res.data, true, this.currentAccountIndex, false, err);
           });
         }
       }
@@ -4239,7 +4398,7 @@ export default Vue.extend({
         this.parseRandom(
             JSON.parse(JSON.stringify(json)), rawConfig, random.id
             , !testSubList, testSubList && i >= existCount, testSubList && i >= existCount
-            , function (randomName, constConfig, constJson) {
+            ,  (randomName, constConfig, constJson) => {
 
               respCount++;
 
@@ -4272,29 +4431,29 @@ export default Vue.extend({
                   };
                 }
               } else {
-                var cb = function (url, res, err) {
+                var cb =  (url, res, err) => {
                   if (callback != null) {
                     callback(url, res, err, random);
                   } else {
-                    App.onResponse(url, res, err);
+                    this.onResponse(url, res, err);
                   }
                 };
 
                 if (show == true) {
                   vInput.value = JSON.stringify(constJson, null, '    ');
-                  App.send(false, cb);
+                  this.send(false, cb);
                 } else {
-                  App.request(false, type, url, constJson, header, cb);
+                  this.request(false, type, url, constJson, header, cb);
                 }
               }
 
               if (testSubList && respCount >= count) { // && which >= count - 1) {
-                App.randomSubs = subs;
-                if (App.isRandomListShow == true) {
-                  App.resetCount(item);
+                this.randomSubs = subs;
+                if (this.isRandomListShow == true) {
+                  this.resetCount(item);
                   item.subs = subs;
                 }
-                App.testRandom(false, false, true, count);
+                this.testRandom(false, false, true, count);
               }
 
             }
@@ -4306,7 +4465,7 @@ export default Vue.extend({
 
     resetCount: function (randomItem) {
       if (randomItem == null) {
-        App.log('resetCount  randomItem == null >> return');
+        this.log('resetCount  randomItem == null >> return');
         return;
       }
       randomItem.totalCount  = 0;
@@ -4340,8 +4499,8 @@ export default Vue.extend({
         log(e);
         vSend.disabled = true;
 
-        App.view  = 'error';
-        App.error = {
+        this.view  = 'error';
+        this.error = {
           msg: e.message
         };
 
@@ -4501,7 +4660,7 @@ export default Vue.extend({
         const start = value.indexOf('(');
         const end   = value.lastIndexOf(')');
 
-        var request4Db = function (tableName, which, p_k, pathKeys, key, lastKeyInPath, isRandom, isDesc, step) {
+        var request4Db =  (tableName, which, p_k, pathKeys, key, lastKeyInPath, isRandom, isDesc, step) => {
           // const tableName = JSONResponse.getTableName(pathKeys[pathKeys.length - 2]);
           vOutput.value = 'requesting value for ' + tableName + '/' + key + ' from database...';
 
@@ -4533,10 +4692,10 @@ export default Vue.extend({
           }
 
           // reqCount ++;
-          App.request(true, REQUEST_TYPE_JSON, baseUrl + '/get', req, {}, function (url, res, err) {
+          this.request(true, REQUEST_TYPE_JSON, baseUrl + '/get', req, {},  (url, res, err) => {
             // respCount ++;
             try {
-              App.onResponse(url, res, err);
+              this.onResponse(url, res, err);
             } catch (e) {
             }
 
@@ -4681,7 +4840,7 @@ export default Vue.extend({
         }
       }
 
-      var baseUrl = StringUtil.trim(App.getBaseUrl());
+      var baseUrl = StringUtil.trim(this.getBaseUrl());
       if (baseUrl == '') {
         alert('请先输入有效的URL！');
         return;
@@ -4696,7 +4855,7 @@ export default Vue.extend({
         return;
       }
 
-      const list     = App.remotes || [];
+      const list     = this.remotes || [];
       const allCount = list.length;
       doneCount      = 0;
 
@@ -4710,17 +4869,17 @@ export default Vue.extend({
           accounts[this.currentAccountIndex].isLoggedIn = true;
         }
         var index = accountIndex < 0 ? this.currentAccountIndex : accountIndex;
-        this.onClickAccount(index, accounts[index], function (isLoggedIn, index, err) {
+        this.onClickAccount(index, accounts[index],  (isLoggedIn, index, err) => {
           // if (index >= 0 && isLoggedIn == false) {
           //   alert('第 ' + index + ' 个账号登录失败！' + (err == null ? '' : err.message))
-          //   App.test(isRandom, accountIndex + 1)
+          //   this.test(isRandom, accountIndex + 1)
           //   return
           // }
-          App.showTestCase(true, false);
-          App.startTest(list, allCount, isRandom, accountIndex);
+          this.showTestCase(true, false);
+          this.startTest(list, allCount, isRandom, accountIndex);
         });
       } else {
-        App.startTest(list, allCount, isRandom, accountIndex);
+        this.startTest(list, allCount, isRandom, accountIndex);
       }
     },
 
@@ -4735,31 +4894,31 @@ export default Vue.extend({
           continue;
         }
         if (document.url == '/login' || document.url == '/logout') { //login会导致登录用户改变为默认的但UI上还显示原来的，单独测试OWNER权限时能通过很困惑
-          App.log('test  document.url == "/login" || document.url == "/logout" >> continue');
+          this.log('test  document.url == "/login" || document.url == "/logout" >> continue');
           doneCount++;
           continue;
         }
-        App.log('test  document = ' + JSON.stringify(document, null, '  '));
+        this.log('test  document = ' + JSON.stringify(document, null, '  '));
 
         const index = i;
 
         var header = null;
         try {
-          header = App.getHeader(document.header);
+          header = this.getHeader(document.header);
         } catch (e) {
-          App.log('test  for ' + i + ' >> try { header = App.getHeader(document.header) } catch (e) { \n' + e.message);
+          this.log('test  for ' + i + ' >> try { header = this.getHeader(document.header) } catch (e) { \n' + e.message);
         }
 
-        App.request(false, document.type, baseUrl + document.url, App.getRequest(document.request), header, function (url, res, err) {
+        this.request(false, document.type, baseUrl + document.url, this.getRequest(document.request), header, (url, res, err) => {
 
           try {
-            App.onResponse(url, res, err);
-            App.log('test  App.request >> res.data = ' + JSON.stringify(res.data, null, '  '));
+            this.onResponse(url, res, err);
+            this.log('test  this.request >> res.data = ' + JSON.stringify(res.data, null, '  '));
           } catch (e) {
-            App.log('test  App.request >> } catch (e) {\n' + e.message);
+            this.log('test  this.request >> } catch (e) {\n' + e.message);
           }
 
-          App.compareResponse(allCount, list, index, item, res.data, isRandom, accountIndex, false, err);
+          this.compareResponse(allCount, list, index, item, res.data, isRandom, accountIndex, false, err);
         });
       }
 
@@ -4767,7 +4926,7 @@ export default Vue.extend({
 
     compareResponse: function (allCount, list, index, item, response, isRandom, accountIndex, justRecoverTest, err) {
       var it = item || {}; //请求异步
-      var d  = (isRandom ? App.currentRemoteItem.Document : it.Document) || {}; //请求异步
+      var d  = (isRandom ? this.currentRemoteItem.Document : it.Document) || {}; //请求异步
       var r  = isRandom ? it.Random : null; //请求异步
       var tr = it.TestRecord || {}; //请求异步
 
@@ -4778,12 +4937,12 @@ export default Vue.extend({
           path: err.message + '\n\n'
         };
       } else {
-        var standardKey = App.isMLEnabled != true ? 'response' : 'standard';
+        var standardKey = this.isMLEnabled != true ? 'response' : 'standard';
         var standard    = StringUtil.isEmpty(tr[standardKey], true) ? null : JSON.parse(tr[standardKey]);
-        tr.compare      = JSONResponse.compareResponse(standard, App.removeDebugInfo(response) || {}, '', App.isMLEnabled) || {};
+        tr.compare      = JSONResponse.compareResponse(standard, this.removeDebugInfo(response) || {}, '', this.isMLEnabled) || {};
       }
 
-      App.onTestResponse(allCount, list, index, it, d, r, tr, response, tr.compare || {}, isRandom, accountIndex, justRecoverTest);
+      this.onTestResponse(allCount, list, index, it, d, r, tr, response, tr.compare || {}, isRandom, accountIndex, justRecoverTest);
     },
 
     onTestResponse: function (allCount, list, index, it, d, r, tr, response, cmp, isRandom, accountIndex, justRecoverTest) {
@@ -4878,9 +5037,9 @@ export default Vue.extend({
       var toId   = random == null ? null : random.toId;
       if (toId != null && toId > 0) {
 
-        for (var i in App.randoms) {
+        for (var i in this.randoms) {
 
-          var toIt = App.randoms[i];
+          var toIt = this.randoms[i];
           if (toIt != null && toIt.Random != null && toIt.Random.id == toId) {
 
             var toRandom = toIt.Random;
@@ -4905,7 +5064,7 @@ export default Vue.extend({
               }
             }
 
-            Vue.set(App.randoms, i, toIt);
+            Vue.set(this.randoms, i, toIt);
 
             break;
           }
@@ -4935,7 +5094,7 @@ export default Vue.extend({
       item = item || {};
       var document;
       if (isRandom) {
-        document = App.currentRemoteItem || {};
+        document = this.currentRemoteItem || {};
       } else {
         document = item.Document = item.Document || {};
       }
@@ -4955,8 +5114,8 @@ export default Vue.extend({
        * beyond compare会把第一个文件的后面一段与第二个文件匹配，
        * 导致必须先删除第一个文件内的后面与第二个文件重复的一段，再重新对比。
        */
-      setTimeout(function () {
-        var tests = App.tests[String(App.currentAccountIndex)] || {};
+      setTimeout( () => {
+        var tests = this.tests[String(this.currentAccountIndex)] || {};
         saveTextAs(
             '# APIJSON自动化回归测试-后\n主页: https://github.com/Tencent/APIJSON'
             + '\n\n接口名称: \n' + (document.version > 0 ? 'V' + document.version : 'V*') + ' ' + document.name
@@ -5031,8 +5190,8 @@ export default Vue.extend({
             tag       : 'TestRecord'
           };
 
-          this.request(true, REQUEST_TYPE_JSON, url, req, {}, function (url, res, err) {
-            App.onResponse(url, res, err);
+          this.request(true, REQUEST_TYPE_JSON, url, req, {}, (url, res, err) => {
+            this.onResponse(url, res, err);
 
             var data = res.data || {};
             if (data.code != CODE_SUCCESS && testRecord != null && testRecord.id != null) {
@@ -5041,7 +5200,7 @@ export default Vue.extend({
             }
 
             if (isRandom) {
-              App.updateToRandomSummary(item, -1);
+              this.updateToRandomSummary(item, -1);
             }
             item.compareType    = JSONResponse.COMPARE_NO_STANDARD;
             item.compareMessage = '查看结果';
@@ -5049,13 +5208,13 @@ export default Vue.extend({
             item.hintMessage    = '没有校验标准！';
             item.TestRecord     = null;
 
-            App.updateTestRecord(0, list, index, item, currentResponse, isRandom, App.currentAccountIndex, true);
+            this.updateTestRecord(0, list, index, item, currentResponse, isRandom, this.currentAccountIndex, true);
           });
         } else { //上传新的校验标准
           // if (isRandom && random.id <= 0) {
           //   alert('请先上传这个配置！')
-          //   App.currentRandomItem = random
-          //   App.showExport(true, false, true)
+          //   this.currentRandomItem = random
+          //   this.showExport(true, false, true)
           //   return
           // }
 
@@ -5089,7 +5248,7 @@ export default Vue.extend({
             TestRecord: {
               documentId: isNewRandom ? null : (isRandom ? random.documentId : document.id),
               randomId  : isRandom && !isNewRandom ? random.id : null,
-              host      : App.getBaseUrl(),
+              host      : this.getBaseUrl(),
               compare   : JSON.stringify(testRecord.compare || {}),
               response  : JSON.stringify(currentResponse || {}),
               standard  : isML ? JSON.stringify(stddObj) : null
@@ -5098,14 +5257,14 @@ export default Vue.extend({
           };
           // }
           // else {
-          //   url = App.server + '/post/testrecord/ml'
+          //   url = this.server + '/post/testrecord/ml'
           //   req = {
           //     documentId: document.id
           //   }
           // }
 
-          this.request(true, REQUEST_TYPE_JSON, url, req, {}, function (url, res, err) {
-            App.onResponse(url, res, err);
+          this.request(true, REQUEST_TYPE_JSON, url, req, {},  (url, res, err) => {
+            this.onResponse(url, res, err);
 
             var data = res.data || {};
             if (data.code != CODE_SUCCESS) {
@@ -5114,7 +5273,7 @@ export default Vue.extend({
               }
             } else {
               if (isRandom) {
-                App.updateToRandomSummary(item, -1);
+                this.updateToRandomSummary(item, -1);
               }
 
               item.compareType    = JSONResponse.COMPARE_EQUAL;
@@ -5148,14 +5307,14 @@ export default Vue.extend({
               //
               // if (! isNewRandom) {
               //   if (isRandom) {
-              //     App.showRandomList(true, App.currentRemoteItem)
+              //     this.showRandomList(true, this.currentRemoteItem)
               //   }
               //   else {
-              //     App.showTestCase(true, false)
+              //     this.showTestCase(true, false)
               //   }
               // }
 
-              App.updateTestRecord(0, list, index, item, currentResponse, isRandom);
+              this.updateTestRecord(0, list, index, item, currentResponse, isRandom);
             }
 
           });
@@ -5172,14 +5331,14 @@ export default Vue.extend({
         TestRecord: {
           documentId   : isRandom ? doc.documentId : doc.id,
           randomId     : isRandom ? doc.id : null,
-          testAccountId: App.getCurrentAccountId(),
-          'host'       : App.getBaseUrl(),
+          testAccountId: this.getCurrentAccountId(),
+          'host'       : this.getBaseUrl(),
           '@order'     : 'date-',
-          '@column'    : 'id,userId,documentId,randomId,response' + (App.isMLEnabled ? ',standard' : ''),
-          '@having'    : App.isMLEnabled ? 'length(standard)>2' : null  // '@having': App.isMLEnabled ? 'json_length(standard)>0' : null
+          '@column'    : 'id,userId,documentId,randomId,response' + (this.isMLEnabled ? ',standard' : ''),
+          '@having'    : this.isMLEnabled ? 'length(standard)>2' : null  // '@having': this.isMLEnabled ? 'json_length(standard)>0' : null
         }
-      }, {}, function (url, res, err) {
-        App.onResponse(url, res, err);
+      }, {}, (url, res, err) => {
+        this.onResponse(url, res, err);
 
         var data = (res || {}).data || {};
         if (data.code != CODE_SUCCESS) {
@@ -5188,7 +5347,7 @@ export default Vue.extend({
         }
 
         item.TestRecord = data.TestRecord;
-        App.compareResponse(allCount, list, index, item, response, isRandom, App.currentAccountIndex, true, err);
+        this.compareResponse(allCount, list, index, item, response, isRandom, this.currentAccountIndex, true, err);
       });
     },
 
