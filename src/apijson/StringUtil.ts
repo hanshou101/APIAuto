@@ -23,7 +23,7 @@ var StringUtil = {
    * @param s
    * @return
    */
-  get: function(s) {
+  get: function (s?: null | string) {
     return s == null ? '' : s;
   },
 
@@ -31,7 +31,7 @@ var StringUtil = {
    * @param s
    * @return
    */
-  trim: function(s) {
+  trim: function (s?: null | string) {
     return StringUtil.get(s).trim();
   },
 
@@ -39,7 +39,7 @@ var StringUtil = {
    * @param s
    * @return
    */
-  noBlank: function(s) {
+  noBlank: function (s: null | string) {
     return StringUtil.get(s).replace(/ /g, '');
   },
 
@@ -48,7 +48,7 @@ var StringUtil = {
    * @param trim
    * @return
    */
-  isEmpty: function(s, trim) {
+  isEmpty: function (s?: null | string, trim?: boolean) {
     if (s == null) {
       return true;
     }
@@ -66,7 +66,7 @@ var StringUtil = {
    * @param s
    * @return
    */
-  isName(s) {
+  isName(s: null | string) {
     return s != null && s.length > 0 && /[a-zA-Z_]/.test(s.substring(0, 1)) && /^[0-9a-zA-Z_]+$/.test(s);
   },
 
@@ -74,7 +74,7 @@ var StringUtil = {
    * @param s
    * @return
    */
-  isBigName(s) {
+  isBigName(s: null | string) {
     return s != null && s.length > 0 && /[A-Z]/.test(s.substring(0, 1)) && /^[0-9a-zA-Z_]+$/.test(s);
   },
 
@@ -82,11 +82,11 @@ var StringUtil = {
    * @param s
    * @return
    */
-  isSmallName(s) {
+  isSmallName(s: null | string) {
     return s != null && s.length > 0 && /[a-z]/.test(s.substring(0, 1)) && /^[0-9a-zA-Z_]+$/.test(s);
   },
 
-  isConstName(s) {
+  isConstName(s: null | string) {
     return s != null && s.length > 0 && /[A-Z_]/.test(s.substring(0, 1)) && /^[0-9A-Z_]+$/.test(s);
   },
 
@@ -96,7 +96,7 @@ var StringUtil = {
    * @param suffix
    * @return key + suffix，第一个字母小写
    */
-  addSuffix: function(key, suffix) {
+  addSuffix: function (key: string, suffix: string) {
     key = StringUtil.noBlank(key);
     if (key == '') {
       return StringUtil.firstCase(suffix);
@@ -106,18 +106,15 @@ var StringUtil = {
 
   /**首字母大写或小写
    * TODO upper == null 时不处理，false 小写，true 大写
-   * @param key
-   * @param upper
-   * @return
    */
-  firstCase: function(key, upper) {
+  firstCase: function (key?: null | string, upper?: boolean) {
     key = StringUtil.get(key);
     if (key == '') {
       return '';
     }
 
     const first = key.substring(0, 1);
-    key = (upper ? first.toUpperCase() : first.toLowerCase()) + key.substring(1, key.length);
+    key         = (upper ? first.toUpperCase() : first.toLowerCase()) + key.substring(1, key.length);
 
     return key;
   },
@@ -127,20 +124,18 @@ var StringUtil = {
    * @param trim
    * @return
    */
-  toUpperCase: function(s, trim) {
+  toUpperCase: function (s: string, trim?: boolean) {
     s = trim ? StringUtil.trim(s) : StringUtil.get(s);
     return s.toUpperCase();
   },
   /**全部小写
-   * @param s
-   * @return
    */
-  toLowerCase: function(s, trim) {
+  toLowerCase: function (s: string, trim?: boolean) {
     s = trim ? StringUtil.trim(s) : StringUtil.get(s);
     return s.toLowerCase();
   },
 
-  split: function (s, separator) {
+  split: function (s?: string, separator?: string) {
     if (s == null) {
       return null;
     }
@@ -153,17 +148,17 @@ var StringUtil = {
       return [s];
     }
 
-    return s.split(separator)
+    return s.split(separator);
   },
 
-  isNumber: function (s) {
+  isNumber: function (s?: string) {
     return typeof s == 'string' && /^[0-9]+$/.test(s);
   }
 
-}
+};
 
 //校正（自动补全等）字符串>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 export {
   StringUtil,
-}
+};

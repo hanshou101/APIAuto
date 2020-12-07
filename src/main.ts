@@ -1,5 +1,8 @@
-import Vue  from 'vue';
-import Main from './main.vue';
+import Vue          from 'vue';
+import Main         from '../main.vue';
+import {JSONObject} from './apijson/JSONObject';
+import {StringUtil} from './apijson/StringUtil';
+import {CodeUtil}   from './apijson/CodeUtil';
 
 declare const $: JQShortNS.Static$;
 
@@ -100,7 +103,7 @@ Vue.use({
         return false;
       }
 
-      var method    = App.getMethod();
+      var method    = (App as any).getMethod();
       var mIndex    = method == null ? -1 : method.indexOf('/');
       var isRestful = mIndex > 0 && mIndex < method.length - 1;
 
@@ -222,7 +225,7 @@ Vue.use({
         var table  = null;
         var column = null;
 
-        var method    = App.getMethod();
+        var method    = (App as any).getMethod();
         var mIndex    = method == null ? -1 : method.indexOf('/');
         var isRestful = mIndex > 0 && mIndex < method.length - 1;
 
@@ -297,13 +300,13 @@ Vue.use({
 
                 var pathUri = (StringUtil.isEmpty(path) ? '' : path + '/') + key;
 
-                var c = CodeUtil.getCommentFromDoc(docObj == null ? null : docObj['[]'], table, column, App.getMethod(), App.database, App.language, true, false, pathUri.split('/'), isRestful, val); // this.getResponseHint({}, table, $event
+                var c = CodeUtil.getCommentFromDoc(docObj == null ? null : docObj['[]'], table, column, (App as any).getMethod(), App.database, App.language, true, false, pathUri.split('/'), isRestful, val); // this.getResponseHint({}, table, $event
                 s0    = column + (StringUtil.isEmpty(c, true) ? '' : ': ' + c);
               }
 
               var pathUri = (StringUtil.isEmpty(path) ? '' : path + '/') + (StringUtil.isEmpty(column) ? key : column);
 
-              var c = CodeUtil.getCommentFromDoc(docObj == null ? null : docObj['[]'], table, isRestful ? key : null, App.getMethod(), App.database, App.language, true, false, pathUri.split('/'), isRestful, val);
+              var c = CodeUtil.getCommentFromDoc(docObj == null ? null : docObj['[]'], table, isRestful ? key : null, (App as any).getMethod(), (App as any).database, (App as any).language, true, false, pathUri.split('/'), isRestful, val);
               s     = (StringUtil.isEmpty(path) ? '' : path + '/') + key + ' 中 '
                 + (
                   StringUtil.isEmpty(c, true) ? '' : table + ': '
@@ -325,7 +328,7 @@ Vue.use({
         // alert('setResponseHint  table = ' + table + '; column = ' + column)
 
         var pathUri = (StringUtil.isEmpty(path) ? '' : path + '/') + key;
-        var c       = CodeUtil.getCommentFromDoc(docObj == null ? null : docObj['[]'], table, isRestful ? key : column, method, App.database, App.language, true, false, pathUri.split('/'), isRestful, val);
+        var c       = CodeUtil.getCommentFromDoc(docObj == null ? null : docObj['[]'], table, isRestful ? key : column, method, (App as any).database, (App as any).language, true, false, pathUri.split('/'), isRestful, val);
 
         s += pathUri + (StringUtil.isEmpty(c, true) ? '' : ': ' + c);
       } catch (e) {
@@ -490,7 +493,7 @@ var doneCount: number;
 // APIJSON >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 var App = new Vue({
-  el: '#app',
+  el    : '#app',
   render: (h) => h(Main),
 });
 // .$mount('#app');

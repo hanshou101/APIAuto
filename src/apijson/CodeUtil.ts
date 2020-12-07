@@ -13,35 +13,60 @@
  limitations under the License.*/
 
 
+import {JSONObject} from './JSONObject';
+
+namespace TypeNS {
+  export type ValueType = null | Array<any> | IndexedObj | string;
+
+  export type ParseCodeCb = {
+    onParseParentStart(): string;     //
+    onParseParentEnd(): string;       //
+    onParseChildArray(key: string, value: ValueType, index: number): string;    //
+    onParseChildObject(key: string, value: ValueType, index: number): string;   //
+    onParseChildOther(key: string, value: ValueType, index: number, isOuter?: boolean): string;   //
+  } & ({
+    onParseJSONArray(key: string, value: ValueType, index: number): string;    //
+    onParseJSONObject(key: string, value: ValueType, index: number): string;   //
+  } | {
+    onParseArray(key: string, value: ValueType, index: number, isOuter?: boolean): string; //
+  });
+
+}
+
+import {log}          from './api-util';
+import {StringUtil}   from './StringUtil';
+import {format}       from './JSONRequest';
+import {JSONResponse} from './JSONResponse';
+
 /**util for generate code
  * @author Lemon
  */
 var CodeUtil = {
   TAG: 'CodeUtil',
 
-  LANGUAGE_KOTLIN: 'Kotlin',
-  LANGUAGE_JAVA: 'Java',
+  LANGUAGE_KOTLIN : 'Kotlin',
+  LANGUAGE_JAVA   : 'Java',
   LANGUAGE_C_SHARP: 'C#',
 
-  LANGUAGE_SWIFT: 'Swift',
+  LANGUAGE_SWIFT      : 'Swift',
   LANGUAGE_OBJECTIVE_C: 'Objective-C',
 
-  LANGUAGE_GO: 'Go',
+  LANGUAGE_GO         : 'Go',
   LANGUAGE_C_PLUS_PLUS: 'C++',
 
   LANGUAGE_TYPE_SCRIPT: 'TypeScript',
   LANGUAGE_JAVA_SCRIPT: 'JavaScript',
 
-  LANGUAGE_PHP: 'PHP',
+  LANGUAGE_PHP   : 'PHP',
   LANGUAGE_PYTHON: 'Python',
 
-  type: 'JSON',
-  database: 'MYSQL',
-  schema: 'sys',
-  language: 'Kotlin',
-  tableList: [],
-  thirdParty: 'YAPI',
-  thirdPartyApiMap: {},
+  type            : 'JSON',
+  database        : 'MYSQL',
+  schema          : 'sys',
+  language        : 'Kotlin',
+  tableList       : [],
+  thirdParty      : 'YAPI',
+  thirdPartyApiMap: {} as IndexedObj,
 
   /**生成JSON的注释
    * @param reqStr //已格式化的JSON String
@@ -51,12 +76,12 @@ var CodeUtil = {
    * @param language
    * @return parseComment
    */
-  parseComment: function (reqStr, tableList, method, database, language, isReq) { //怎么都获取不到真正的长度，cols不行，默认20不变，maxLineLength不行，默认undefined不变 , maxLineLength) {
+  parseComment: function (reqStr: string, tableList: Array<any>, method: null | string, database: string, language: string, isReq: boolean) { //怎么都获取不到真正的长度，cols不行，默认20不变，maxLineLength不行，默认undefined不变 , maxLineLength) {
     if (StringUtil.isEmpty(reqStr)) {
       return '';
     }
-    method = method == null ? 'GET' : method;
-    var mIndex = method.indexOf('/');
+    method        = method == null ? 'GET' : method;
+    var mIndex    = method.indexOf('/');
     var isRestful = mIndex > 0 && mIndex < method.length - 1;
     if (isRestful != true) {
       method = method.toUpperCase();
@@ -65,8 +90,8 @@ var CodeUtil = {
     var lines = reqStr.split('\n');
     var line;
 
-    var depth = 0;
-    var names = [];
+    var depth        = 0;
+    var names        = [];
     var isInSubquery = false;
 
     var index;
@@ -74,12 +99,12 @@ var CodeUtil = {
     var value;
 
     var comment;
-    for (var i = 0; i < lines.length; i ++) {
+    for (var i = 0; i < lines.length; i++) {
       line = lines[i].trim();
 
       //每一种都要提取:左边的key
       index = line == null ? -1 : line.indexOf(': '); //可能是 ' 或 "，所以不好用 ': , ": 判断
-      key = index < 0 ? '' : line.substring(1, index - 1);
+      key   = index < 0 ? '' : line.substring(1, index - 1);
 
       if (line.endsWith(',')) {
         line = line.substring(0, line.length - 1);
@@ -89,31 +114,27 @@ var CodeUtil = {
       if (line.endsWith('{')) { //对象，判断是不是Table，再加对应的注释
         isInSubquery = key.endsWith('@');
 
-        depth ++;
+        depth++;
         names[depth] = key;
 
         comment = CodeUtil.getComment4Request(tableList, names[depth - 1], key, null, method, false, database, language, isReq, names, isRestful);
-      }
-      else {
+      } else {
         if (line.endsWith('}')) {
           isInSubquery = false;
 
           if (line.endsWith('{}')) { //对象，判断是不是Table，再加对应的注释
             comment = CodeUtil.getComment4Request(tableList, names[depth], key, null, method, false, database, language, isReq, names, isRestful);
-          }
-          else {
-            depth --;
+          } else {
+            depth--;
             continue;
           }
-        }
-        else if (key == '') { //[ 1, \n 2, \n 3] 跳过
+        } else if (key == '') { //[ 1, \n 2, \n 3] 跳过
           continue;
-        }
-        else { //其它，直接在后面加上注释
+        } else { //其它，直接在后面加上注释
           var isArray = line.endsWith('['); // []  不影响
-          value = isArray ? [] : line.substring(index + 2).trim()
+          value       = isArray ? [] : line.substring(index + 2).trim();
           // alert('depth = ' + depth + '; line = ' + line + '; isArray = ' + isArray);
-          comment = CodeUtil.getComment4Request(tableList, names[depth], key, value, method, isInSubquery, database, language, isReq, names, isRestful);
+          comment     = CodeUtil.getComment4Request(tableList, names[depth], key, value, method, isInSubquery, database, language, isReq, names, isRestful);
         }
       }
 
@@ -124,7 +145,6 @@ var CodeUtil = {
   },
 
 
-
   /**生成封装 Unity3D-C# 请求 JSON 的代码
    * 只需要把所有 对象标识{} 改为数组标识 []
    * @param name
@@ -132,23 +152,25 @@ var CodeUtil = {
    * @param depth
    * @return parseCode
    */
-  parseCSharpRequest: function(name, reqObj, depth) {
-    if (depth == null || depth < 0) {
+  parseCSharpRequest: function (name: null | string, reqObj: TypeNS.ValueType, __depth: null | number): string {
+    var depth: number;
+    if (__depth == null || __depth < 0) {
       depth = 0;
+    } else {
+      depth = __depth;
     }
 
     var isEmpty = true;
     if (reqObj instanceof Array) {
       isEmpty = reqObj.length <= 0;
-    }
-    else if (reqObj instanceof Object) {
+    } else if (reqObj instanceof Object) {
       isEmpty = Object.keys(reqObj).length <= 0;
     }
 
-    var padding = CodeUtil.getBlank(depth);
+    var padding     = CodeUtil.getBlank(depth);
     var nextPadding = CodeUtil.getBlank(depth + 1);
 
-    return CodeUtil.parseCode(name, reqObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
         return isEmpty ? 'new JObject{' : 'new JObject{\n';
@@ -167,12 +189,17 @@ var CodeUtil = {
       },
 
       onParseArray: function (key, value, index, isOuter) {
-        var isEmpty = value.length <= 0;
-        var s = 'new JArray{' + (isEmpty ? '' : '\n');
+        if (!(value instanceof Array)) {
+          throw new Error('value不是Array！');
+        }
 
-        var inner = '';
+        var isEmpty = value.length <= 0;
+        var s       = 'new JArray{' + (isEmpty ? '' : '\n');
+
+        var inner        = '';
         var innerPadding = isOuter ? nextPadding : CodeUtil.getBlank(depth + 2);
-        for (var i = 0; i < value.length; i ++) {
+
+        for (var i = 0; i < value.length; i++) {
           inner += (i > 0 ? ',\n' : '') + innerPadding + CodeUtil.parseCSharpRequest(null, value[i], depth + (isOuter ? 1 : 2));
         }
         s += inner;
@@ -185,20 +212,28 @@ var CodeUtil = {
         var v; //避免改变原来的value
         if (value == null) {
           v = 'null';
-        }
-        else if (value instanceof Array) {
+        } else if (value instanceof Array) {
+
+          if (!('onParseArray' in this)) {
+            throw new Error('onParseArray不存在！');
+          }
+
           v = this.onParseArray(key, value, index, isOuter);
-        }
-        else if (typeof value == 'string') {
+        } else if (typeof value == 'string') {
           v = '"' + value + '"';
-        }
-        else {
-          v = value
+        } else {
+          v = value;
         }
 
         return (index > 0 ? ',\n' : '') + (key == null ? v : (isOuter ? padding : nextPadding) + '{"' + key + '", ' + v + '}');
       }
-    })
+    };
+
+    if (name == null) {
+      throw new Error('name是null！');
+    }
+
+    return CodeUtil.parseCode(name, reqObj, cb);
 
   },
 
@@ -210,23 +245,26 @@ var CodeUtil = {
    * @param isSmart
    * @return parseCode
    */
-  parsePHPRequest: function(name, reqObj, depth, isSmart) {
-    if (depth == null || depth < 0) {
+  parsePHPRequest   : function (name: null | string, reqObj: Array<any> | IndexedObj, __depth: null | number, isSmart: boolean): string {
+    var depth: number;
+    if (__depth == null || __depth < 0) {
       depth = 0;
+    } else {
+      depth = __depth;
     }
+
     var isEmpty = true;
     if (reqObj instanceof Array) {
       isEmpty = reqObj.length <= 0;
-    }
-    else if (reqObj instanceof Object) {
+    } else if (reqObj instanceof Object) {
       isEmpty = Object.keys(reqObj).length <= 0;
     }
 
-    var padding = CodeUtil.getBlank(depth);
+    var padding     = CodeUtil.getBlank(depth);
     var nextPadding = CodeUtil.getBlank(depth + 1);
-    var quote = isSmart ? "'" : '"';
+    var quote       = isSmart ? '\'' : '"';
 
-    return CodeUtil.parseCode(name, reqObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
         if (isSmart) {
@@ -250,12 +288,17 @@ var CodeUtil = {
         return this.onParseChildOther(key, value, index);
       },
 
-      onParseArray: function (key, value, index, isOuter) {
+      onParseArray: function (key: string, value, index, isOuter) {
         var s = (isSmart ? '[' : 'array(') + (isEmpty ? '' : '\n');
 
-        var inner = '';
+        var inner        = '';
         var innerPadding = isOuter ? nextPadding : CodeUtil.getBlank(depth + 2);
-        for (var i = 0; i < value.length; i ++) {
+
+        if (!(value instanceof Array)) {
+          throw new Error('此处value不为Array！');
+        }
+
+        for (var i = 0; i < value.length; i++) {
           inner += (i > 0 ? ',\n' : '') + innerPadding + CodeUtil.parsePHPRequest(null, value[i], depth + (isOuter ? 1 : 2), isSmart);
         }
         s += inner;
@@ -268,23 +311,30 @@ var CodeUtil = {
         var v; //避免改变原来的value
         if (value == null) {
           v = 'null';
-        }
-        else if (value instanceof Array) {
+        } else if (value instanceof Array) {
+
+          if (!('onParseArray' in this)) {
+            throw new Error('onParseArray不存在！');
+          }
+
           v = this.onParseArray(key, value, index, isOuter);
-        }
-        else if (value instanceof Object) {
+        } else if (value instanceof Object) {
           v = CodeUtil.parsePHPRequest(key, value, depth + 1, isSmart);
-        }
-        else if (typeof value == 'string') {
-          log(CodeUtil.TAG, 'parsePHPRequest  for typeof value === "string" >>  ' );
+        } else if (typeof value == 'string') {
+          log(CodeUtil.TAG, 'parsePHPRequest  for typeof value === "string" >>  ');
           v = quote + value + quote;
-        }
-        else {
-          v = value
+        } else {
+          v = value;
         }
         return (index > 0 ? ',\n' : '') + (key == null ? '' : (isOuter ? padding : nextPadding) + quote + key + quote + ' => ') + v;
       }
-    })
+    };
+
+    if (name == null) {
+      throw new Error('name为null！');
+    }
+
+    return CodeUtil.parseCode(name, reqObj, cb);
 
   },
   /**生成封装 Web-Python 请求JSON 的代码
@@ -292,33 +342,35 @@ var CodeUtil = {
    * @param reqStr
    * @return
    */
-  parsePythonRequest: function(name, reqObj, depth, isSmart, reqStr) {
+  parsePythonRequest: function (name: null | string, reqObj: TypeNS.ValueType, __depth: null | number, isSmart: boolean, reqStr?: string): string {
     if (isSmart != true) {
       if (StringUtil.isEmpty(reqStr, true) && reqObj != null) {
-        reqStr = JSON.stringify(reqObj, null, '    ')
+        reqStr = JSON.stringify(reqObj, null, '    ');
       }
-      return StringUtil.trim(reqStr).replace(/\/\//g, '#').replace(/null/g, 'None').replace(/false/g, 'False').replace(/true/g, 'True').replace(/\/\*/g, isSmart ? '\'\'\'' : '"""').replace(/\*\//g, isSmart ? '\'\'\'' : '"""').replace(/'/g, '"')
+      return StringUtil.trim(reqStr).replace(/\/\//g, '#').replace(/null/g, 'None').replace(/false/g, 'False').replace(/true/g, 'True').replace(/\/\*/g, isSmart ? '\'\'\'' : '"""').replace(/\*\//g, isSmart ? '\'\'\'' : '"""').replace(/'/g, '"');
     }
 
-    if (depth == null || depth < 0) {
+    var depth: number;
+    if (__depth == null || __depth < 0) {
       depth = 0;
+    } else {
+      depth = __depth;
     }
 
     var isEmpty = true;
     if (reqObj instanceof Array) {
       isEmpty = reqObj.length <= 0;
-    }
-    else if (reqObj instanceof Object) {
+    } else if (reqObj instanceof Object) {
       isEmpty = Object.keys(reqObj).length <= 0;
     }
 
-    var padding = CodeUtil.getBlank(depth);
-    var nextPadding = CodeUtil.getBlank(depth + 1);
-    var nextNextPadding = CodeUtil.getBlank(depth + 2);
+    var padding             = CodeUtil.getBlank(depth);
+    var nextPadding         = CodeUtil.getBlank(depth + 1);
+    var nextNextPadding     = CodeUtil.getBlank(depth + 2);
     var nextNextNextPadding = CodeUtil.getBlank(depth + 3);
-    var quote = isSmart ? "'" : '"'
+    var quote               = isSmart ? '\'' : '"';
 
-    return CodeUtil.parseCode(name, reqObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
         return isEmpty ? '{' : '{\n';
@@ -337,12 +389,17 @@ var CodeUtil = {
       },
 
       onParseArray: function (key, value, index, isOuter) {
-        var isEmpty = value.length <= 0;
-        var s = '[' + (isEmpty ? '' : '\n');
 
-        var inner = '';
+        if (!(value instanceof Array)) {
+          throw new Error('value不是Array！');
+        }
+
+        var isEmpty = value.length <= 0;
+        var s       = '[' + (isEmpty ? '' : '\n');
+
+        var inner        = '';
         var innerPadding = isOuter ? nextNextPadding : nextNextNextPadding;
-        for (var i = 0; i < value.length; i ++) {
+        for (var i = 0; i < value.length; i++) {
           inner += (i > 0 ? ',\n' : '') + innerPadding + CodeUtil.parsePythonRequest(null, value[i], depth + (isOuter ? 1 : 2), isSmart);
         }
         s += inner;
@@ -352,10 +409,20 @@ var CodeUtil = {
       },
 
       onParseChildOther: function (key, value, index, isOuter) {
-        var valStr = (value instanceof Array ? this.onParseArray(key, value, index, true) :CodeUtil.getCode4Value(CodeUtil.LANGUAGE_PYTHON, value, key, depth, isSmart));
+        if (!('onParseArray' in this)) {
+          throw new Error('onParseArray不存在！');
+        }
+
+        var valStr = (value instanceof Array ? this.onParseArray(key, value, index, true) : CodeUtil.getCode4Value(CodeUtil.LANGUAGE_PYTHON, value, key, depth, isSmart));
         return (index > 0 ? ',\n' : '') + (key == null ? '' : (isOuter ? padding : nextPadding) + quote + key + quote + ': ') + valStr;
       }
-    })
+    };
+
+    if (name == null) {
+      throw new Error('name为null！');
+    }
+
+    return CodeUtil.parseCode(name, reqObj, cb);
 
   },
 
@@ -366,23 +433,25 @@ var CodeUtil = {
    * @param depth
    * @return parseCode
    */
-  parseSwiftRequest: function(name, reqObj, depth) {
-    if (depth == null || depth < 0) {
+  parseSwiftRequest: function (name: null | string, reqObj: TypeNS.ValueType, __depth: number): string {
+    var depth: number;
+    if (__depth == null || __depth < 0) {
       depth = 0;
+    } else {
+      depth = __depth;
     }
 
     var isEmpty = true;
     if (reqObj instanceof Array) {
       isEmpty = reqObj.length <= 0;
-    }
-    else if (reqObj instanceof Object) {
+    } else if (reqObj instanceof Object) {
       isEmpty = Object.keys(reqObj).length <= 0;
     }
 
-    var padding = CodeUtil.getBlank(depth);
+    var padding     = CodeUtil.getBlank(depth);
     var nextPadding = CodeUtil.getBlank(depth + 1);
 
-    return CodeUtil.parseCode(name, reqObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
         return isEmpty ? '[' : '[\n';
@@ -401,12 +470,16 @@ var CodeUtil = {
       },
 
       onParseArray: function (key, value, index, isOuter) {
-        var isEmpty = value.length <= 0;
-        var s = '[' + (isEmpty ? '' : '\n');
+        if (!(value instanceof Array)) {
+          throw new Error('value不是Array！');
+        }
 
-        var inner = '';
+        var isEmpty = value.length <= 0;
+        var s       = '[' + (isEmpty ? '' : '\n');
+
+        var inner        = '';
         var innerPadding = isOuter ? nextPadding : CodeUtil.getBlank(depth + 2);
-        for (var i = 0; i < value.length; i ++) {
+        for (var i = 0; i < value.length; i++) {
           inner += (i > 0 ? ',\n' : '') + innerPadding + CodeUtil.parseSwiftRequest(null, value[i], depth + (isOuter ? 1 : 2));
         }
         s += inner;
@@ -419,20 +492,27 @@ var CodeUtil = {
         var v; //避免改变原来的value
         if (value == null) {
           v = 'nil';
-        }
-        else if (value instanceof Array) {
+        } else if (value instanceof Array) {
+
+          if (!('onParseArray' in this)) {
+            throw new Error('onParseArray不存在！');
+          }
+
           v = this.onParseArray(key, value, index, isOuter);
-        }
-        else if (typeof value == 'string') {
+        } else if (typeof value == 'string') {
           v = '"' + value + '"';
-        }
-        else {
-          v = value
+        } else {
+          v = value;
         }
 
         return (index > 0 ? ',\n' : '') + (key == null ? '' : (isOuter ? padding : nextPadding) + '"' + key + '": ') + v;
       }
-    })
+    };
+    if (name == null) {
+      throw new Error('name为null');
+    }
+
+    return CodeUtil.parseCode(name, reqObj, cb);
 
   },
 
@@ -443,23 +523,25 @@ var CodeUtil = {
    * @param depth
    * @return parseCode
    */
-  parseGoRequest: function(name, reqObj, depth) {
-    if (depth == null || depth < 0) {
+  parseGoRequest: function (name: null | string, reqObj: TypeNS.ValueType, __depth: number): string {
+    var depth: number;
+    if (__depth == null || __depth < 0) {
       depth = 0;
+    } else {
+      depth = __depth;
     }
 
     var isEmpty = true;
     if (reqObj instanceof Array) {
       isEmpty = reqObj.length <= 0;
-    }
-    else if (reqObj instanceof Object) {
+    } else if (reqObj instanceof Object) {
       isEmpty = Object.keys(reqObj).length <= 0;
     }
 
-    var padding = CodeUtil.getBlank(depth);
+    var padding     = CodeUtil.getBlank(depth);
     var nextPadding = CodeUtil.getBlank(depth + 1);
 
-    return CodeUtil.parseCode(name, reqObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
         return isEmpty ? 'map[string]interface{} {' : 'map[string]interface{} {\n';
@@ -478,12 +560,15 @@ var CodeUtil = {
       },
 
       onParseArray: function (key, value, index, isOuter) {
+        if (!(value instanceof Array)) {
+          throw new Error('value不是Array！');
+        }
         var isEmpty = value.length <= 0;
-        var s = '[]interface{} {' + (isEmpty ? '' : '\n');
+        var s       = '[]interface{} {' + (isEmpty ? '' : '\n');
 
-        var inner = '';
+        var inner        = '';
         var innerPadding = isOuter ? nextPadding : CodeUtil.getBlank(depth + 2);
-        for (var i = 0; i < value.length; i ++) {
+        for (var i = 0; i < value.length; i++) {
           inner += (i > 0 ? ',\n' : '') + innerPadding + CodeUtil.parseGoRequest(null, value[i], depth + (isOuter ? 1 : 2));
         }
         s += inner;
@@ -496,20 +581,26 @@ var CodeUtil = {
         var v; //避免改变原来的value
         if (value == null) {
           v = 'nil';
-        }
-        else if (value instanceof Array) {
+        } else if (value instanceof Array) {
+
+          if (!('onParseArray' in this)) {
+            throw new Error('onParseArray不存在！');
+          }
+
           v = this.onParseArray(key, value, index, isOuter);
-        }
-        else if (typeof value == 'string') {
+        } else if (typeof value == 'string') {
           v = '"' + value + '"';
-        }
-        else {
-          v = value
+        } else {
+          v = value;
         }
 
         return (index > 0 ? ',\n' : '') + (key == null ? '' : (isOuter ? padding : nextPadding) + '"' + key + '": ') + v;
       }
-    })
+    };
+    if (name == null) {
+      throw new Error('name为null！');
+    }
+    return CodeUtil.parseCode(name, reqObj, cb);
 
   },
 
@@ -520,7 +611,7 @@ var CodeUtil = {
    * @param depth
    * @return parseCode
    */
-  parseObjectiveCRequest: function(name, reqObj, depth) {
+  parseObjectiveCRequest: function (name: null | string, reqObj: TypeNS.ValueType, depth: number) {
     return CodeUtil.parseSwiftRequest(name, reqObj, depth);
   },
 
@@ -532,20 +623,21 @@ var CodeUtil = {
    * @return parseCode
    * @return isSmart 是否智能
    */
-  parseKotlinRequest: function(name, reqObj, depth, isSmart, isArrayItem, useVar4Value, type, host, url, comment, isRESTful) {
+  parseKotlinRequest: function (
+    name: null | string, reqObj: TypeNS.ValueType, depth: number, isSmart: boolean, isArrayItem: boolean, useVar4Value: boolean, type: string, host: null | string, url: null | string, comment: null | string, isRESTful: boolean
+  ): string {
     if (depth == null || depth < 0) {
       depth = 0;
     }
     var isEmpty = true;
     if (reqObj instanceof Array) {
       isEmpty = reqObj.length <= 0;
-    }
-    else if (reqObj instanceof Object) {
+    } else if (reqObj instanceof Object) {
       isEmpty = Object.keys(reqObj).length <= 0;
     }
 
-    var padding = CodeUtil.getBlank(depth);
-    var nextPadding = CodeUtil.getBlank(depth + 1);
+    var padding         = CodeUtil.getBlank(depth);
+    var nextPadding     = CodeUtil.getBlank(depth + 1);
     var nextNextPadding = CodeUtil.getBlank(depth + 2);
 
     if (depth <= 0) {
@@ -554,43 +646,42 @@ var CodeUtil = {
 
       url = url || '';
 
-      var lastIndex = url.lastIndexOf('/');
-      var methodUri = url; // lastIndex < 0 ? url : url.substring(lastIndex);
+      var lastIndex  = url.lastIndexOf('/');
+      var methodUri  = url; // lastIndex < 0 ? url : url.substring(lastIndex);
       var methodName = JSONResponse.getVariableName(lastIndex < 0 ? url : url.substring(lastIndex + 1));
 
-      url = url.substring(0, lastIndex);
-      lastIndex = url.lastIndexOf('/');
-      var varName = JSONResponse.getVariableName(lastIndex < 0 ? url : url.substring(lastIndex + 1));
+      url           = url.substring(0, lastIndex);
+      lastIndex     = url.lastIndexOf('/');
+      var varName   = JSONResponse.getVariableName(lastIndex < 0 ? url : url.substring(lastIndex + 1));
       var modelName = StringUtil.firstCase(varName, true);
 
       if (StringUtil.isEmpty(modelName, true) != true) {
-        var useStaticClass = type == 'JSON' && !isSmart
+        var useStaticClass = type == 'JSON' && !isSmart;
 
-        var nextNextNextPadding = CodeUtil.getBlank(depth + 3);
+        var nextNextNextPadding     = CodeUtil.getBlank(depth + 3);
         var nextNextNextNextPadding = CodeUtil.getBlank(depth + 4);
 
         // var controllerUri = url; // lastIndex < 0 ? '' : url.substring(0, lastIndex);
-        var isPost = type != 'PARAM' && (methodUri.indexOf('post') >= 0 || methodUri.indexOf('add') >= 0 || methodUri.indexOf('create') >= 0);
-        var isPut = type != 'PARAM' && (methodUri.indexOf('put') >= 0 || methodUri.indexOf('edit') >= 0 || methodUri.indexOf('update') >= 0);
+        var isPost   = type != 'PARAM' && (methodUri.indexOf('post') >= 0 || methodUri.indexOf('add') >= 0 || methodUri.indexOf('create') >= 0);
+        var isPut    = type != 'PARAM' && (methodUri.indexOf('put') >= 0 || methodUri.indexOf('edit') >= 0 || methodUri.indexOf('update') >= 0);
         var isDelete = type != 'PARAM' && (methodUri.indexOf('delete') >= 0 || methodUri.indexOf('remove') >= 0 || methodUri.indexOf('del') >= 0);
-        var isWrite = isPost || isPut || isDelete;
-        var isGet = !isWrite; // methodUri.indexOf('get') >= 0 || methodUri.indexOf('fetch') >= 0 || methodUri.indexOf('query') >= 0;
-        var isList = isGet && (methodUri.indexOf('list') >= 0 || methodUri.indexOf('List') >= 0 || typeof reqObj.pageNum == 'number');
+        var isWrite  = isPost || isPut || isDelete;
+        var isGet    = !isWrite; // methodUri.indexOf('get') >= 0 || methodUri.indexOf('fetch') >= 0 || methodUri.indexOf('query') >= 0;
+        var isList   = isGet && (methodUri.indexOf('list') >= 0 || methodUri.indexOf('List') >= 0 || typeof (reqObj as IndexedObj).pageNum == 'number');
 
         var dataType = isWrite ? 'Int' : (isList ? 'List<' + modelName + '>' : modelName);
 
-        var requestType = (type == 'JSON' ? (isSmart ? 'RequestBody' : modelName + (isList ? 'List' : '') + 'Request') : (type == 'DATA' ? 'Map<String, RequestBody>' : ''));
-        var responseType = modelName + (isList ? 'List' : '') + 'Response';
-        var fullResponseType = responseType + '<' + dataType + '>'
+        var requestType      = (type == 'JSON' ? (isSmart ? 'RequestBody' : modelName + (isList ? 'List' : '') + 'Request') : (type == 'DATA' ? 'Map<String, RequestBody>' : ''));
+        var responseType     = modelName + (isList ? 'List' : '') + 'Response';
+        var fullResponseType = responseType + '<' + dataType + '>';
 
         var str = '';
         if (reqObj != null) {
           if (useStaticClass) {
             str += '\nvar request = ' + CodeUtil.parseKotlinRequest(requestType, reqObj, depth, isSmart, isArrayItem, false, type, null, null, null, true);
-          }
-          else {
-            for (var k in reqObj) {
-              var v = reqObj[k];
+          } else {
+            for (var k in (reqObj as IndexedObj)) {
+              var v = (reqObj as IndexedObj)[k];
 
               if (v instanceof Object) {
                 var kn = isSmart ? JSONResponse.getVariableName(k) : CodeUtil.getKotlinTypeFromJS(k, v, false, false, false, !isSmart);
@@ -601,7 +692,7 @@ var CodeUtil = {
         }
 
         var s = '//调用示例' + (StringUtil.isEmpty(str, true) ? '' : '\n' + StringUtil.trim(str) + '\n')
-          + '\n' + methodName + '(' + (useStaticClass ? 'request' : CodeUtil.getCode4KotlinArgValues(reqObj, true)) + ')'
+          + '\n' + methodName + '(' + (useStaticClass ? 'request' : CodeUtil.getCode4KotlinArgValues(reqObj, true)) + ')';
 
         if (isSmart) {
           s += '\n' + nextPadding + '.enqueue(object : HttpCallbackImpl<' + fullResponseType + '>() {'
@@ -609,9 +700,8 @@ var CodeUtil = {
             + '\n' + nextNextNextPadding + 'super.onHttpSucceed(data, requestCode)'
             + '\n' + nextNextNextPadding + '//TODO 继续处理'
             + '\n' + nextNextPadding + '}'
-            + '\n' + nextPadding + '})\n\n'
-        }
-        else {
+            + '\n' + nextPadding + '})\n\n';
+        } else {
           s += '\n' + nextPadding + '.enqueue(object : Callback<' + fullResponseType + '>() {'
             + '\n' + nextNextPadding + 'override fun onFailure(call: Call<' + fullResponseType + '>, t: Throwable) {'
             + '\n' + nextNextNextPadding + 'Toast.makeText(context, t.message, Toast.LENGTH_SHORT).show()'
@@ -630,7 +720,7 @@ var CodeUtil = {
             + '\n' + nextNextNextPadding + 'var data = body.data'
             + '\n' + nextNextNextPadding + '//TODO 继续处理'
             + '\n' + nextNextPadding + '}'
-            + '\n' + nextPadding + '})\n\n'
+            + '\n' + nextPadding + '})\n\n';
         }
 
         //这里不用 Query-QueryMap ，而是直接 toJSONString 传给 String，是因为 QueryMap 会用 Retrofit/OKHttp 内部会取出值来拼接
@@ -640,7 +730,7 @@ var CodeUtil = {
           + (type == 'JSON' ? '\n' + nextPadding + '@Headers("Content-Type: application/json;charset=UTF-8")' : (type == 'FORM' ? '\n' + nextPadding + '@FormUrlEncoded' : (type == 'DATA' ? '\n' + nextPadding + '@Multipart' : '')))
           + '\n' + nextPadding + '@' + requestMethod + '("' + methodUri + '")'
           + '\n' + nextPadding + 'fun ' + methodName + '(' + (type == 'JSON' ? (isSmart ? '@Body requestBody: ' + requestType : '@Body req: ' + requestType) : (type == 'DATA' ? '@PartMap requestBodyMap: ' + requestType : CodeUtil.getCode4KotlinArgs(reqObj, true, type == 'PARAM' ? 'Query' : 'Field', !isSmart, !isSmart, true))) + '): Call<' + (isSmart ? 'JSONResponse' : fullResponseType) + '>'
-          + '\n' +'}\n'
+          + '\n' + '}\n'
           + '\n/**请求方法'
           + '\n * ' + StringUtil.trim(comment)
           + '\n */'
@@ -656,7 +746,7 @@ var CodeUtil = {
           + '\n' + 'const val RETROFIT = Retrofit.Builder()'
           + '\n' + nextPadding + '.baseUrl("' + StringUtil.trim(host) + '")'
           + '\n' + nextPadding + '.addConverterFactory(GsonConverterFactory.create())'
-          + '\n' + nextPadding + '.build()\n'
+          + '\n' + nextPadding + '.build()\n';
 
 
         if (isSmart) {
@@ -756,9 +846,8 @@ var CodeUtil = {
             + '\n' + nextPadding + 'override fun hideLoading() {'
             + '\n' + nextNextPadding + 'httpCallback?.hideLoading()'
             + '\n' + nextPadding + '}\n'
-            + '\n' + '}\n'
-        }
-        else {
+            + '\n' + '}\n';
+        } else {
           if (isList) {
             modelName += 'List';
             varName += 'List';
@@ -791,24 +880,32 @@ var CodeUtil = {
       //RESTful 等非 APIJSON 规范的 API >>>>>>>>>>>>>>>>>>>>>>>>>>
     }
 
-    var useStaticClass = isRESTful && type == 'JSON' && isSmart != true && StringUtil.isEmpty(name, true) != true
+    var useStaticClass = isRESTful && type == 'JSON' && isSmart != true && StringUtil.isEmpty(name, true) != true;
+
+    if (name == null) {
+      throw new Error('name是null！');
+    }
 
     var parentKey = JSONObject.isArrayKey(name)
       ? JSONResponse.getVariableName(CodeUtil.getItemKey(name)) + (depth <= 1 ? '' : depth)
       : CodeUtil.getTableKey(JSONResponse.getVariableName(name));
 
+    if (name == null) {
+      throw new Error('name为null！');
+    }
+
     return CodeUtil.parseCode(name, reqObj, {
 
       onParseParentStart: function () {
         if (useStaticClass) {
-          return StringUtil.firstCase(JSONResponse.getVariableName(name), true) + '()' + (isEmpty ? '' : '.apply {\n')
+          return StringUtil.firstCase(JSONResponse.getVariableName(name), true) + '()' + (isEmpty ? '' : '.apply {\n');
         }
         return useVar4Value && type == 'DATA' ? 'mapOf<String, RequestBody>(\n' : (isEmpty ? 'HashMap<String, Any>(' : 'mapOf(\n');
       },
 
       onParseParentEnd: function () {
         if (useStaticClass) {
-          return isEmpty ? '' : '\n' + padding + '}'
+          return isEmpty ? '' : '\n' + padding + '}';
         }
         return isEmpty ? ')' : '\n' + padding + ')';
       },
@@ -817,8 +914,8 @@ var CodeUtil = {
         if (useVar4Value) {
           return this.onParseChildOther(key, value, index);
         }
-        var vn = useStaticClass ? JSONResponse.getVariableName(key) : null
-        var kn = useStaticClass ? StringUtil.firstCase(JSONResponse.getVariableName(key), true) : null
+        var vn = useStaticClass ? JSONResponse.getVariableName(key) : null;
+        var kn = useStaticClass ? StringUtil.firstCase(JSONResponse.getVariableName(key), true) : null;
         return (index <= 0 ? '' : (useStaticClass ? '\n' : ',\n')) + nextPadding + (useStaticClass ? vn + ' = ' : '"' + key + '" to ') + CodeUtil.parseKotlinRequest(useStaticClass ? kn : key, value, depth + 1, isSmart, isArrayItem, useVar4Value, type, null, null, null, isRESTful);
       },
 
@@ -826,8 +923,8 @@ var CodeUtil = {
         if (useVar4Value) {
           return this.onParseChildOther(key, value, index);
         }
-        var vn = useStaticClass ? JSONResponse.getVariableName(key) : null
-        var kn = useStaticClass ? StringUtil.firstCase(JSONResponse.getVariableName(key), true) : null
+        var vn = useStaticClass ? JSONResponse.getVariableName(key) : null;
+        var kn = useStaticClass ? StringUtil.firstCase(JSONResponse.getVariableName(key), true) : null;
         return (index <= 0 ? '' : (useStaticClass ? '\n' : ',\n')) + nextPadding + (useStaticClass ? vn + ' = ' : '"' + key + '" to ') + CodeUtil.parseKotlinRequest(useStaticClass ? kn : key, value, depth + 1, isSmart, isArrayItem, useVar4Value, type, null, null, null, isRESTful);
       },
 
@@ -836,14 +933,18 @@ var CodeUtil = {
           return this.onParseChildOther(key, value, index, isOuter);
         }
 
+        if (!(value instanceof Array)) {
+          throw new Error('value不是Array！');
+        }
+
         var isEmpty = value.length <= 0;
-        var s = isEmpty ? 'ArrayList<Any>(' : 'listOf(\n';
+        var s       = isEmpty ? 'ArrayList<Any>(' : 'listOf(\n';
 
         if (isEmpty != true) {
-          var inner = '';
+          var inner        = '';
           var innerPadding = isOuter ? nextPadding : nextNextPadding;
 
-          for (var i = 0; i < value.length; i ++) {
+          for (var i = 0; i < value.length; i++) {
             inner += (i > 0 ? ',\n' : '') + innerPadding + CodeUtil.parseKotlinRequest(null, value[i], depth + (isOuter ? 1 : 2), isSmart, isArrayItem, useVar4Value, type, null, null, null, isRESTful);
           }
           s += inner;
@@ -857,9 +958,13 @@ var CodeUtil = {
       onParseChildOther: function (key, value, index, isOuter) {
         var valStr;
         if (useVar4Value != true && value instanceof Array) {
+
+          if (!('onParseArray' in this)) {
+            throw new Error('onParseArray不存在！');
+          }
+
           valStr = this.onParseArray(key, value, index, isOuter);
-        }
-        else {
+        } else {
           valStr = useVar4Value ? JSONResponse.getVariableName(key) : CodeUtil.getCode4Value(CodeUtil.LANGUAGE_KOTLIN, value);
           if (useVar4Value && type == 'DATA') {
             if (value instanceof Object) {
@@ -870,9 +975,9 @@ var CodeUtil = {
         }
 
         return (index <= 0 ? '' : (useStaticClass ? '\n' : ',\n')) + (key == null ? '' : (isOuter ? padding : nextPadding)
-            + (useStaticClass ? JSONResponse.getVariableName(key) + ' = ' : '"' + key + '" to ')) + valStr;
+          + (useStaticClass ? JSONResponse.getVariableName(key) + ' = ' : '"' + key + '" to ')) + valStr;
       }
-    })
+    });
 
   },
 
@@ -884,15 +989,17 @@ var CodeUtil = {
    * @return parseCode
    * @return isSmart 是否智能
    */
-  parseJavaRequest: function(name, reqObj, depth, isSmart, isArrayItem, useVar4Value, type, url, comment) {
-    name = name || 'request'
+  parseJavaRequest: function (
+    name: string, reqObj: TypeNS.ValueType, depth: number, isSmart: boolean, isArrayItem?: boolean, useVar4Value?: boolean, type?: string, url?: string, comment?: string
+  ): string {
+    name = name || 'request';
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
 
-    var prefix = CodeUtil.getBlank(depth);
-    var nextPrefix = CodeUtil.getBlank(depth + 1);
+    var prefix         = CodeUtil.getBlank(depth);
+    var nextPrefix     = CodeUtil.getBlank(depth + 1);
     var nextNextPrefix = CodeUtil.getBlank(depth + 2);
 
     if (depth <= 0) {
@@ -901,23 +1008,23 @@ var CodeUtil = {
 
       url = url || '';
 
-      var lastIndex = url.lastIndexOf('/');
-      var methodUri = url; // lastIndex < 0 ? url : url.substring(lastIndex);
+      var lastIndex  = url.lastIndexOf('/');
+      var methodUri  = url; // lastIndex < 0 ? url : url.substring(lastIndex);
       var methodName = JSONResponse.getVariableName(lastIndex < 0 ? url : url.substring(lastIndex + 1));
 
-      url = url.substring(0, lastIndex);
-      lastIndex = url.lastIndexOf('/');
-      var varName = JSONResponse.getVariableName(lastIndex < 0 ? url : url.substring(lastIndex + 1));
+      url           = url.substring(0, lastIndex);
+      lastIndex     = url.lastIndexOf('/');
+      var varName   = JSONResponse.getVariableName(lastIndex < 0 ? url : url.substring(lastIndex + 1));
       var modelName = StringUtil.firstCase(varName, true);
 
       if (StringUtil.isEmpty(modelName, true) != true) {
         // var controllerUri = url; // lastIndex < 0 ? '' : url.substring(0, lastIndex);
-        var isPost = type != 'PARAM' && (methodUri.indexOf('post') >= 0 || methodUri.indexOf('add') >= 0 || methodUri.indexOf('create') >= 0);
-        var isPut = type != 'PARAM' && (methodUri.indexOf('put') >= 0|| methodUri.indexOf('edit') >= 0 || methodUri.indexOf('update') >= 0);
+        var isPost   = type != 'PARAM' && (methodUri.indexOf('post') >= 0 || methodUri.indexOf('add') >= 0 || methodUri.indexOf('create') >= 0);
+        var isPut    = type != 'PARAM' && (methodUri.indexOf('put') >= 0 || methodUri.indexOf('edit') >= 0 || methodUri.indexOf('update') >= 0);
         var isDelete = type != 'PARAM' && (methodUri.indexOf('delete') >= 0 || methodUri.indexOf('remove') >= 0 || methodUri.indexOf('del') >= 0);
-        var isWrite = isPost || isPut || isDelete;
-        var isGet = ! isWrite; // methodUri.indexOf('get') >= 0 || methodUri.indexOf('fetch') >= 0 || methodUri.indexOf('query') >= 0;
-        var isList = isGet && (methodUri.indexOf('list') >= 0 || methodUri.indexOf('List') >= 0 || typeof reqObj.pageNum == 'number');
+        var isWrite  = isPost || isPut || isDelete;
+        var isGet    = !isWrite; // methodUri.indexOf('get') >= 0 || methodUri.indexOf('fetch') >= 0 || methodUri.indexOf('query') >= 0;
+        var isList   = isGet && (methodUri.indexOf('list') >= 0 || methodUri.indexOf('List') >= 0 || typeof (reqObj as IndexedObj).pageNum == 'number');
 
         var dataType = isWrite ? 'Integer' : (isList ? 'List<' + modelName + '>' : modelName);
 
@@ -925,8 +1032,8 @@ var CodeUtil = {
 
         var str = '';
         if (reqObj != null) {
-          for (var k in reqObj) {
-            var v = reqObj[k];
+          for (var k in (reqObj as IndexedObj)) {
+            var v = (reqObj as IndexedObj)[k];
 
             if (v instanceof Object) {
               str += '\n' + CodeUtil.parseJavaRequest(JSONResponse.getVariableName(k), v, depth, isSmart);
@@ -939,21 +1046,21 @@ var CodeUtil = {
           + '\n/**'
           + '\n * ' + StringUtil.trim(comment)
           + '\n */'
-          + '\npublic static ' + 'Call<' + (isSmart ? 'JSONResponse' : responseType + '<' + dataType + '>') + '>' + ' ' + methodName + '(' + CodeUtil.getCode4JavaArgs(reqObj, true, null, ! isSmart) + ') {\n'
+          + '\npublic static ' + 'Call<' + (isSmart ? 'JSONResponse' : responseType + '<' + dataType + '>') + '>' + ' ' + methodName + '(' + CodeUtil.getCode4JavaArgs(reqObj, true, null, !isSmart) + ') {\n'
           + (type == 'JSON' || type == 'DATA' ? CodeUtil.parseJavaRequest(name, reqObj, depth + 1, isSmart, isArrayItem, true, type, url) : '') + '\n'
           + (type == 'JSON' ? '\n' + nextPrefix + 'RequestBody requestBody = RequestBody.create(MediaType.parse("application/json;charset=UTF-8"), JSON.toJSONString(request));' : '')
           + '\n' + nextPrefix + modelName + 'Service service = retrofit.create(' + modelName + 'Service.class);'
-          + '\n' + nextPrefix + 'return service.' + methodName + '(' + (type == 'JSON' ? 'requestBody' : (type == 'DATA' ? 'request' : CodeUtil.getCode4JavaArgs(reqObj, false, null, ! isSmart, true, true))) + ');'
+          + '\n' + nextPrefix + 'return service.' + methodName + '(' + (type == 'JSON' ? 'requestBody' : (type == 'DATA' ? 'request' : CodeUtil.getCode4JavaArgs(reqObj, false, null, !isSmart, true, true))) + ');'
           + '\n}\n';
 
         //这里不用 Query-QueryMap ，而是直接 toJSONString 传给 String，是因为 QueryMap 会用 Retrofit/OKHttp 内部会取出值来拼接
         s += '\npublic interface ' + modelName + 'Service {  // ApiService {  //建议统一用这个，方法都放进来'
-          + (type == 'JSON' ? '\n' + nextPrefix + '@Headers("Content-Type: application/json;charset=UTF-8")' : (type == 'FORM' ? '\n' + nextPrefix + '@FormUrlEncoded': (type == 'DATA' ? '\n' + nextPrefix + '@Multipart': '')))
+          + (type == 'JSON' ? '\n' + nextPrefix + '@Headers("Content-Type: application/json;charset=UTF-8")' : (type == 'FORM' ? '\n' + nextPrefix + '@FormUrlEncoded' : (type == 'DATA' ? '\n' + nextPrefix + '@Multipart' : '')))
           + '\n' + nextPrefix + '@' + requestMethod + '("' + methodUri + '")'
-          + '\n' + nextPrefix + 'Call<' + (isSmart ? 'JSONResponse' : responseType + '<' + dataType + '>') + '>' + ' ' + methodName + '(' + (type == 'JSON' ? '@Body RequestBody requestBody' : (type == 'DATA' ? '@PartMap Map<String, RequestBody> requestBodyMap' : CodeUtil.getCode4JavaArgs(reqObj, true, type == 'PARAM' ? 'Query' : 'Field', ! isSmart, true))) + ');'
+          + '\n' + nextPrefix + 'Call<' + (isSmart ? 'JSONResponse' : responseType + '<' + dataType + '>') + '>' + ' ' + methodName + '(' + (type == 'JSON' ? '@Body RequestBody requestBody' : (type == 'DATA' ? '@PartMap Map<String, RequestBody> requestBodyMap' : CodeUtil.getCode4JavaArgs(reqObj, true, type == 'PARAM' ? 'Query' : 'Field', !isSmart, true))) + ');'
           + '\n' + '}';
 
-        if (! isSmart) {
+        if (!isSmart) {
           if (isList) {
             modelName += 'List';
             varName += 'List';
@@ -962,7 +1069,7 @@ var CodeUtil = {
           s += '\n\n' +
             'public class ' + responseType + '<T> extends Response<T> {\n' +
             nextPrefix + 'private ' + dataType + ' ' + varName + ';\n\n' +
-            nextPrefix + 'public '+ dataType + ' get' + modelName + '() {\n' +
+            nextPrefix + 'public ' + dataType + ' get' + modelName + '() {\n' +
             nextNextPrefix + 'return ' + varName + ';\n' +
             nextPrefix + '}\n' +
             nextPrefix + 'public ' + responseType + '<T> set' + modelName + '(' + dataType + ' ' + varName + ') {\n' +
@@ -1027,7 +1134,12 @@ var CodeUtil = {
         return '';
       },
 
-      onParseChildArray: function (key, value, index) {
+      onParseChildArray: function (key, __value, index) {
+        if (__value == null) {
+          throw new Error('value为null！');
+        }
+        var value = __value as IndexedObj;
+
         if (useVar4Value) {
           return this.onParseChildOther(key, value, index);
         }
@@ -1035,9 +1147,9 @@ var CodeUtil = {
         var s = '\n\n' + prefix + '{   ' + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
         var count = isSmart ? (value.count || 0) : 0;
-        var page = isSmart ? (value.page || 0) : 0;
+        var page  = isSmart ? (value.page || 0) : 0;
         var query = isSmart ? value.query : null;
-        var join = isSmart ? value.join : null;
+        var join  = isSmart ? value.join : null;
 
         log(CodeUtil.TAG, 'parseJavaRequest  for  count = ' + count + '; page = ' + page);
 
@@ -1066,9 +1178,8 @@ var CodeUtil = {
           }
 
           s += nextPrefix + parentKey + '.putAll(' + name + '.toArray('
-            + count  + ', ' + page + (alias.length <= 0 ? '' : ', "' + alias + '"') + '));';
-        }
-        else {
+            + count + ', ' + page + (alias.length <= 0 ? '' : ', "' + alias + '"') + '));';
+        } else {
           s += '\n\n' + CodeUtil.getBlank(depth + 1) + parentKey + '.put("' + key + '", ' + name + ');';
         }
 
@@ -1077,7 +1188,13 @@ var CodeUtil = {
         return s;
       },
 
-      onParseChildObject: function (key, value, index) {
+      onParseChildObject: function (key, __value, index) {
+        if (__value == null) {
+          throw new Error('value为null！');
+        }
+
+        const value = __value as IndexedObj;
+
         if (useVar4Value) {
           return this.onParseChildOther(key, value, index);
         }
@@ -1086,14 +1203,14 @@ var CodeUtil = {
 
         var isTable = isSmart && JSONObject.isTableKey(JSONResponse.getTableName(key));
 
-        var column = isTable ? value['@column'] : null;
-        var group = isTable ? value['@group'] : null;
-        var having = isTable ? value['@having'] : null;
-        var order = isTable ? value['@order'] : null;
-        var combine = isTable ? value['@combine'] : null;
-        var schema = isTable ? value['@schema'] : null;
+        var column   = isTable ? value['@column'] : null;
+        var group    = isTable ? value['@group'] : null;
+        var having   = isTable ? value['@having'] : null;
+        var order    = isTable ? value['@order'] : null;
+        var combine  = isTable ? value['@combine'] : null;
+        var schema   = isTable ? value['@schema'] : null;
         var database = isTable ? value['@database'] : null;
-        var role = isTable ? value['@role'] : null;
+        var role     = isTable ? value['@role'] : null;
 
         if (isTable) {
           delete value['@column'];
@@ -1128,13 +1245,17 @@ var CodeUtil = {
       },
 
       onParseArray: function (key, value, index, isOuter) {
+        if (value == null) {
+          throw new Error('value为null');
+        }
+
         if (useVar4Value) {
           return this.onParseChildOther(key, value, index, isOuter);
         }
 
         var s = '\n\n' + prefix + '{   ' + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        var varName = JSONResponse.formatKey(key, true, false, false, true, true, true)
+        var varName = JSONResponse.formatKey(key, true, false, false, true, true, true);
 
         if (isArrayItem != true) {
           s += '\n' + nextPrefix + (isSmart ? 'JSONArray ' : 'List<Object> ') + varName + ' = new ' + (isSmart ? 'JSONArray' : 'ArrayList<>') + '();';
@@ -1144,22 +1265,23 @@ var CodeUtil = {
           var itemName = StringUtil.addSuffix(varName, 'Item') + (depth <= 0 ? '' : depth + 1);
 
           var innerPrefix = CodeUtil.getBlank(depth + 2);
-          var inner = '';
+          var inner       = '';
+
+          if (!(value instanceof Array)) {
+            throw new Error('value不是Array！');
+          }
 
           for (var i = 0; i < value.length; i++) {
             if (value[i] instanceof Object == false) {
               inner += '\n' + nextPrefix + varName + '.add(' + CodeUtil.getCode4Value(CodeUtil.LANGUAGE_JAVA, value[i]) + ');';
-            }
-            else {
+            } else {
               inner += '\n\n' + nextPrefix + '{   ' + '// ' + key + '[' + i + '] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
               if (value[i] instanceof Array) {
                 inner += '\n' + innerPrefix + (isSmart ? 'JSONArray ' : 'List<Object> ') + itemName + ' = new ' + (isSmart ? 'JSONArray' : 'ArrayList<>') + '();';
-              }
-              else if (value[i] instanceof Object) {
+              } else if (value[i] instanceof Object) {
                 inner += '\n' + innerPrefix + (isSmart ? 'JSONObject ' : 'Map<String, Object> ') + itemName + ' = new ' + (isSmart ? 'JSONObject' : 'LinkedHashMap<>') + '();';
-              }
-              else {
+              } else {
                 inner += '//FIXME 这里不可能出现 value[' + i + '] 类型为 ' + (typeof value[i]) + '！'; //不可能
               }
 
@@ -1175,11 +1297,9 @@ var CodeUtil = {
         if (isArrayItem != true) {
           if (reqObj instanceof Array) {
             s += '\n\n' + nextPrefix + parentKey + '.add(' + varName + ');';
-          }
-          else if (reqObj instanceof Object) {
+          } else if (reqObj instanceof Object) {
             s += '\n\n' + nextPrefix + parentKey + '.put("' + key + '", ' + varName + ');';
-          }
-          else {
+          } else {
             s += '//FIXME 这里不可能出现 reqObj 类型为 ' + (typeof reqObj) + '！'; //不可能
           }
         }
@@ -1190,6 +1310,11 @@ var CodeUtil = {
 
       onParseChildOther: function (key, value, index, isOuter) {
         if (useVar4Value != true && value instanceof Array) {
+
+          if (!('onParseArray' in this)) {
+            throw new Error('onParseArray不存在！');
+          }
+
           return this.onParseArray(key, value, index, isOuter);
         }
 
@@ -1224,10 +1349,9 @@ var CodeUtil = {
 
         return '\n' + prefix + parentKey + '.put("' + key + '", ' + valStr + ');';
       }
-    })
+    });
 
   },
-
 
 
   /**解析出 生成Android-Java请求JSON 的代码
@@ -1237,146 +1361,157 @@ var CodeUtil = {
    * @return parseCode
    * @return isSmart 是否智能
    */
-  parseCppRequest: function(name, reqObj, depth, isSmart, isArrayItem) {
-    name = name || 'request'
-    if (depth == null || depth < 0) {
+  parseCppRequest: function (name: null | string, reqObj: TypeNS.ValueType, __depth: null | number, isSmart: boolean, isArrayItem?: boolean) {
+    name = name || 'request';
+    var depth: number;
+    if (__depth == null || __depth < 0) {
       depth = 0;
+    } else {
+      depth = __depth;
     }
 
     var parentKey = JSONObject.isArrayKey(name)
       ? JSONResponse.getVariableName(CodeUtil.getItemKey(name)) + (depth <= 1 ? '' : depth)
       : CodeUtil.getTableKey(JSONResponse.getVariableName(name));
 
-    var prefix = CodeUtil.getBlank(depth);
+    var prefix     = CodeUtil.getBlank(depth);
     var nextPrefix = CodeUtil.getBlank(depth + 1);
 
-    return (depth > 0 ? "" : "rapidjson::Document document;"
-          + "\nrapidjson::Document::AllocatorType& allocator = document.GetAllocator();\n"
-      ) + CodeUtil.parseCode(name, reqObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
-        onParseParentStart: function () {
-          if (isArrayItem == true) {
-            isArrayItem = false;
-            return '';
-          }
-          return '\n' + prefix + 'rapidjson::Value ' + parentKey + '(rapidjson::kObjectType);';
-        },
-
-        onParseParentEnd: function () {
+      onParseParentStart: function () {
+        if (isArrayItem == true) {
+          isArrayItem = false;
           return '';
-        },
-
-        onParseChildArray: function (key, value, index) {
-          var name = JSONResponse.getVariableName(CodeUtil.getItemKey(key)) + (depth <= 0 ? '' : depth + 1);
-
-          var s = '\n\n' + prefix + '{   ' + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
-          s += CodeUtil.parseCppRequest(key, value, depth + 1, isSmart);
-          s += '\n\n' + CodeUtil.getBlank(depth + 1) + parentKey + '.AddMember("' + key + '", ' + name + ', allocator);';
-          s += '\n' + prefix + '}   ' + '// ' + key + ' >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
-
-          return s;
-        },
-
-        onParseChildObject: function (key, value, index) {
-          const name = CodeUtil.getTableKey(JSONResponse.getVariableName(key));
-
-          var s = '\n\n' + prefix + '{   ' + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
-          s += CodeUtil.parseCppRequest(key, value, depth + 1, isSmart);
-          s += '\n\n' + nextPrefix + parentKey + '.AddMember("' + key + '", ' + name + ', allocator);';
-          s += '\n' + prefix + '}   ' + '// ' + key + ' >>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
-
-          return s;
-        },
-
-        onParseArray: function (key, value, index, isOuter) {
-          var s = '\n\n' + prefix + '{   ' + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
-
-          var varName = JSONResponse.formatKey(key, true, false, false, true, true, true)
-
-          if (isArrayItem != true) {
-            s += '\n' + nextPrefix + 'rapidjson::Value ' + varName + '(rapidjson::kArrayType);';
-          }
-
-          if (value.length > 0) {
-            var itemName = StringUtil.addSuffix(varName, 'Item') + (depth <= 0 ? '' : depth + 1);
-
-            var innerPrefix = CodeUtil.getBlank(depth + 2);
-            var inner = '';
-
-            for (var i = 0; i < value.length; i++) {
-              if (value[i] instanceof Object == false) {
-                inner += '\n' + nextPrefix + varName + '.PushBack(' + CodeUtil.getCode4Value(CodeUtil.LANGUAGE_C_PLUS_PLUS, value[i]) + ', allocator);';
-              }
-              else {
-                inner += '\n\n' + nextPrefix + '{   ' + '// ' + key + '[' + i + '] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
-                if (value[i] instanceof Array) {
-                  inner += '\n' + innerPrefix + 'rapidjson::Value ' + itemName + '(rapidjson::kArrayType);';
-                }
-                else if (value[i] instanceof Object) {
-                  inner += '\n' + innerPrefix + 'rapidjson::Value ' + itemName + '(rapidjson::kObjectType);';
-                }
-                else {
-                  inner += '//FIXME 这里不可能出现 value[' + i + '] 类型为 ' + (typeof value[i]) + '！'; //不可能
-                }
-
-                inner += CodeUtil.getCode4Value(CodeUtil.LANGUAGE_C_PLUS_PLUS, value[i], itemName, depth + 1, isSmart, true, CodeUtil.parseCppRequest);
-                inner += '\n' + innerPrefix + varName + '.PushBack(' + itemName + ', allocator);';
-                inner += '\n' + nextPrefix + '}   ' + '// ' + key + '[' + i + '] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
-              }
-            }
-
-            s += inner;
-          }
-
-          if (isArrayItem != true) {
-            if (reqObj instanceof Array) {
-              s += '\n\n' + nextPrefix + parentKey + '.PushBack(' + varName + ', allocator);';
-            }
-            else if (reqObj instanceof Object) {
-              s += '\n\n' + nextPrefix + parentKey + '.AddMember("' + key + '", ' + varName + ', allocator);';
-            }
-            else {
-              s += '//FIXME 这里不可能出现 reqObj 类型为 ' + (typeof reqObj) + '！'; //不可能
-            }
-          }
-
-          s += '\n' + prefix + '}   ' + '// ' + key + ' >>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
-          return s;
-        },
-
-        onParseChildOther: function (key, value, index, isOuter) {
-          if (value instanceof Array) {
-            return this.onParseArray(key, value, index, isOuter);
-          }
-          return '\n' + prefix + parentKey + '.AddMember("' + key + '", ' + CodeUtil.getCode4Value(CodeUtil.LANGUAGE_C_PLUS_PLUS, value) + ', allocator);';
         }
-      })
+        return '\n' + prefix + 'rapidjson::Value ' + parentKey + '(rapidjson::kObjectType);';
+      },
+
+      onParseParentEnd: function () {
+        return '';
+      },
+
+      onParseChildArray: function (key, value, index) {
+        var name = JSONResponse.getVariableName(CodeUtil.getItemKey(key)) + (depth <= 0 ? '' : depth + 1);
+
+        var s = '\n\n' + prefix + '{   ' + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+        s += CodeUtil.parseCppRequest(key, value, depth + 1, isSmart);
+        s += '\n\n' + CodeUtil.getBlank(depth + 1) + parentKey + '.AddMember("' + key + '", ' + name + ', allocator);';
+        s += '\n' + prefix + '}   ' + '// ' + key + ' >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
+
+        return s;
+      },
+
+      onParseChildObject: function (key, value, index) {
+        const name = CodeUtil.getTableKey(JSONResponse.getVariableName(key));
+
+        var s = '\n\n' + prefix + '{   ' + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+        s += CodeUtil.parseCppRequest(key, value, depth + 1, isSmart);
+        s += '\n\n' + nextPrefix + parentKey + '.AddMember("' + key + '", ' + name + ', allocator);';
+        s += '\n' + prefix + '}   ' + '// ' + key + ' >>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
+
+        return s;
+      },
+
+      onParseArray: function (key, value, index, isOuter) {
+        if (!(value instanceof Array)) {
+          throw new Error('value不是Array！');
+        }
+
+        var s = '\n\n' + prefix + '{   ' + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+
+        var varName = JSONResponse.formatKey(key, true, false, false, true, true, true);
+
+        if (isArrayItem != true) {
+          s += '\n' + nextPrefix + 'rapidjson::Value ' + varName + '(rapidjson::kArrayType);';
+        }
+
+        if (value.length > 0) {
+          var itemName = StringUtil.addSuffix(varName, 'Item') + (depth <= 0 ? '' : depth + 1);
+
+          var innerPrefix = CodeUtil.getBlank(depth + 2);
+          var inner       = '';
+
+          for (var i = 0; i < value.length; i++) {
+            if (value[i] instanceof Object == false) {
+              inner += '\n' + nextPrefix + varName + '.PushBack(' + CodeUtil.getCode4Value(CodeUtil.LANGUAGE_C_PLUS_PLUS, value[i]) + ', allocator);';
+            } else {
+              inner += '\n\n' + nextPrefix + '{   ' + '// ' + key + '[' + i + '] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
+              if (value[i] instanceof Array) {
+                inner += '\n' + innerPrefix + 'rapidjson::Value ' + itemName + '(rapidjson::kArrayType);';
+              } else if (value[i] instanceof Object) {
+                inner += '\n' + innerPrefix + 'rapidjson::Value ' + itemName + '(rapidjson::kObjectType);';
+              } else {
+                inner += '//FIXME 这里不可能出现 value[' + i + '] 类型为 ' + (typeof value[i]) + '！'; //不可能
+              }
+
+              inner += CodeUtil.getCode4Value(CodeUtil.LANGUAGE_C_PLUS_PLUS, value[i], itemName, depth + 1, isSmart, true, CodeUtil.parseCppRequest);
+              inner += '\n' + innerPrefix + varName + '.PushBack(' + itemName + ', allocator);';
+              inner += '\n' + nextPrefix + '}   ' + '// ' + key + '[' + i + '] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
+            }
+          }
+
+          s += inner;
+        }
+
+        if (isArrayItem != true) {
+          if (reqObj instanceof Array) {
+            s += '\n\n' + nextPrefix + parentKey + '.PushBack(' + varName + ', allocator);';
+          } else if (reqObj instanceof Object) {
+            s += '\n\n' + nextPrefix + parentKey + '.AddMember("' + key + '", ' + varName + ', allocator);';
+          } else {
+            s += '//FIXME 这里不可能出现 reqObj 类型为 ' + (typeof reqObj) + '！'; //不可能
+          }
+        }
+
+        s += '\n' + prefix + '}   ' + '// ' + key + ' >>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n';
+        return s;
+      },
+
+      onParseChildOther: function (key, value, index, isOuter) {
+        if (value instanceof Array) {
+
+          if (!('onParseArray' in this)) {
+            throw new Error('onParseArray不存在！');
+          }
+
+          return this.onParseArray(key, value, index, isOuter);
+        }
+        return '\n' + prefix + parentKey + '.AddMember("' + key + '", ' + CodeUtil.getCode4Value(CodeUtil.LANGUAGE_C_PLUS_PLUS, value) + ', allocator);';
+      }
+    };
+
+    return (depth > 0 ? '' : 'rapidjson::Document document;'
+        + '\nrapidjson::Document::AllocatorType& allocator = document.GetAllocator();\n'
+    ) + CodeUtil.parseCode(name, reqObj, cb);
 
   },
 
 
-
   /**生成 iOS-Swift 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @param isSmart
    * @return parseCode
    */
-  parseSwiftResponse: function(name_, resObj, depth, isSmart) {
-    if (depth == null || depth < 0) {
+  parseSwiftResponse: function (__name: string, resObj: TypeNS.ValueType, __depth: null | number, isSmart?: boolean) {
+
+    var depth: number;
+    if (__depth == null || __depth < 0) {
       depth = 0;
+    } else {
+      depth = __depth;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
-
-    return CodeUtil.parseCode(name, resObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false ? '' : CodeUtil.getBlank(depth) + 'let ' + name + ': NSDictionary = try! NSJSONSerialization.JSONObjectWithData(resultJson!, options: .MutableContainers) as! NSDictionary \n';
+        return depth > 0 || StringUtil.isEmpty(name, true) == false ? '' : CodeUtil.getBlank(depth) + 'let ' + name + ': NSDictionary = try! NSJSONSerialization.JSONObjectWithData(resultJson!, options: .MutableContainers) as! NSDictionary \n';
       },
 
       onParseParentEnd: function () {
@@ -1388,23 +1523,34 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject不存在！');
+        }
         return this.onParseJSONObject(key, value, index);
       },
 
       onParseChildOther: function (key, value, index) {
 
         if (value instanceof Array) {
-          log(CodeUtil.TAG, 'parseSwiftResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseSwiftResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray不存在！');
+          }
 
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
-          log(CodeUtil.TAG, 'parseSwiftResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseSwiftResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject不存在！');
+          }
 
           return this.onParseJSONObject(key, value, index);
         }
 
-        var type = CodeUtil.getSwiftTypeFromJS(key, value);
+        var type    = CodeUtil.getSwiftTypeFromJS(key, value);
         var padding = '\n' + CodeUtil.getBlank(depth);
         var varName = JSONResponse.getVariableName(key);
 
@@ -1412,13 +1558,14 @@ var CodeUtil = {
           + padding + 'print("' + name + '.' + varName + ' = " + ' + varName + ');';
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
 
-        var padding = '\n' + CodeUtil.getBlank(depth);
+        const value = (__value as Array<any>) || [];
+
+        var padding      = '\n' + CodeUtil.getBlank(depth);
         var innerPadding = padding + CodeUtil.getBlank(1);
 
-        var k = JSONResponse.getVariableName(key);
+        var k        = JSONResponse.getVariableName(key);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
 
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
@@ -1434,8 +1581,7 @@ var CodeUtil = {
         var indexName = 'i' + (depth <= 0 ? '' : depth);
         if (isSmart) {
           s += padding + 'for (' + indexName + ', ' + itemName + ') in ' + k + ' {';
-        }
-        else {
+        } else {
           s += padding + 'let ' + itemName + ': ' + type;
           s += padding + 'for var ' + indexName + ' = 0; ' + indexName + ' < ' + k + '.size(); ' + indexName + '++ {';
           s += innerPadding + itemName + ' = ' + k + '[' + indexName + '] as! ' + type;
@@ -1462,11 +1608,11 @@ var CodeUtil = {
 
       onParseJSONObject: function (key, value, index) {
         var padding = '\n' + CodeUtil.getBlank(depth);
-        var k = JSONResponse.getVariableName(key);
+        var k       = JSONResponse.getVariableName(key);
 
         var s = '\n' + padding + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += padding + 'let ' + k + ': NSDictionary = ' + name + '["' + key + '"] as! NSDictionary\n'
+        s += padding + 'let ' + k + ': NSDictionary = ' + name + '["' + key + '"] as! NSDictionary\n';
 
         s += CodeUtil.parseSwiftResponse(k, value, depth, isSmart);
 
@@ -1474,31 +1620,32 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    };
+    return CodeUtil.parseCode(name, resObj, cb);
 
   },
 
 
   /**生成 iOS-CodeUtil.LANGUAGE_OBJECTIVE_C 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @return parseCode
    */
-  parseObjectiveCResponse: function(name_, resObj, depth) {
+  parseObjectiveCResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
 
-    return CodeUtil.parseCode(name, resObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false ? '' : CodeUtil.getBlank(depth) + 'let ' + name + ': NSDictionary = try! NSJSONSerialization.JSONObjectWithData(resultJson!, options: .MutableContainers) as! NSDictionary \n';
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false ? '' : CodeUtil.getBlank(depth) + 'let ' + name + ': NSDictionary = try! NSJSONSerialization.JSONObjectWithData(resultJson!, options: .MutableContainers) as! NSDictionary \n';
       },
 
       onParseParentEnd: function () {
@@ -1510,23 +1657,37 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
       onParseChildOther: function (key, value, index) {
 
         if (value instanceof Array) {
-          log(CodeUtil.TAG, 'parseSwiftResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseSwiftResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray不存在！');
+          }
 
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
-          log(CodeUtil.TAG, 'parseSwiftResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseSwiftResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
+
 
           return this.onParseJSONObject(key, value, index);
         }
 
-        var type = CodeUtil.getSwiftTypeFromJS(key, value);
+        var type    = CodeUtil.getSwiftTypeFromJS(key, value);
         var padding = '\n' + CodeUtil.getBlank(depth);
         var varName = JSONResponse.getVariableName(key);
 
@@ -1534,13 +1695,16 @@ var CodeUtil = {
           + padding + 'print("' + name + '.' + varName + ' = " + ' + varName + ');';
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        if (!(__value instanceof Array)) {
+          throw new Error('value不是Array！');
+        }
+        const value = __value as Array<any> || [];
 
-        var padding = '\n' + CodeUtil.getBlank(depth);
+        var padding      = '\n' + CodeUtil.getBlank(depth);
         var innerPadding = padding + CodeUtil.getBlank(1);
 
-        var k = JSONResponse.getVariableName(key);
+        var k        = JSONResponse.getVariableName(key);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
 
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
@@ -1579,11 +1743,11 @@ var CodeUtil = {
 
       onParseJSONObject: function (key, value, index) {
         var padding = '\n' + CodeUtil.getBlank(depth);
-        var k = JSONResponse.getVariableName(key);
+        var k       = JSONResponse.getVariableName(key);
 
         var s = '\n' + padding + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += padding + 'let ' + k + ': NSDictionary = ' + name + '["' + key + '"] as! NSDictionary\n'
+        s += padding + 'let ' + k + ': NSDictionary = ' + name + '["' + key + '"] as! NSDictionary\n';
 
         s += CodeUtil.parseSwiftResponse(k, value, depth);
 
@@ -1591,35 +1755,37 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    };
+
+    return CodeUtil.parseCode(name, resObj, cb);
 
   },
 
 
   /**生成 Web-JavaScript 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @param isSmart
    * @return parseCode
    */
-  parseJavaScriptResponse: function(name_, resObj, depth, isSmart) {
+  parseJavaScriptResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isSmart: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
 
-    var varKey = isSmart ? 'let' : 'var'
-    var quote = isSmart ? "'" : '"'
+    var varKey = isSmart ? 'let' : 'var';
+    var quote  = isSmart ? '\'' : '"';
 
     return CodeUtil.parseCode(name, resObj, {
 
       onParseParentStart: function () {
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false ? '' : CodeUtil.getBlank(depth) + varKey + ' ' + name + ' = JSON.parse(resultJson) \n';
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false ? '' : CodeUtil.getBlank(depth) + varKey + ' ' + name + ' = JSON.parse(resultJson) \n';
       },
 
       onParseParentEnd: function () {
@@ -1631,18 +1797,34 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
       onParseChildOther: function (key, value, index) {
 
         if (value instanceof Array) {
-          log(CodeUtil.TAG, 'parseJavaScriptResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseJavaScriptResponse  for typeof value === "array" >>  ');
+
+
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray 不存在！');
+          }
+
 
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
-          log(CodeUtil.TAG, 'parseJavaScriptResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseJavaScriptResponse  for typeof value === "array" >>  ');
+
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
 
           return this.onParseJSONObject(key, value, index);
         }
@@ -1655,13 +1837,13 @@ var CodeUtil = {
           + padding + 'console.log("' + name + '.' + varName + ' = " + ' + varName + ')';
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        const value = (__value as Array<any>) || [];
 
-        var padding = '\n' + CodeUtil.getBlank(depth);
+        var padding      = '\n' + CodeUtil.getBlank(depth);
         var innerPadding = padding + CodeUtil.getBlank(1);
 
-        var k = JSONResponse.getVariableName(key);
+        var k        = JSONResponse.getVariableName(key);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
 
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
@@ -1699,11 +1881,11 @@ var CodeUtil = {
 
       onParseJSONObject: function (key, value, index) {
         var padding = '\n' + CodeUtil.getBlank(depth);
-        var k = JSONResponse.getVariableName(key);
+        var k       = JSONResponse.getVariableName(key);
 
         var s = '\n' + padding + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += padding + varKey + ' ' + k + ' = ' + name + (isSmart && StringUtil.isName(key) ? '.' + key : '[' + quote + key + quote + ']') + ' || {} \n'
+        s += padding + varKey + ' ' + k + ' = ' + name + (isSmart && StringUtil.isName(key) ? '.' + key : '[' + quote + key + quote + ']') + ' || {} \n';
 
         s += CodeUtil.parseJavaScriptResponse(k, value, depth, isSmart);
 
@@ -1711,34 +1893,34 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    });
 
   },
 
   /**生成 Web-PHP 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @param isSmart
    * @return parseCode
    */
-  parsePHPResponse: function(name_, resObj, depth, isSmart) {
+  parsePHPResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isSmart: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
 
     var blank = CodeUtil.getBlank(1);
-    var quote = isSmart ? "'" : '"';
+    var quote = isSmart ? '\'' : '"';
 
     return CodeUtil.parseCode(name, resObj, {
 
       onParseParentStart: function () {
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false ? '' : CodeUtil.getBlank(depth) + '$' + name + ' = json_decode($resultJson, true); \n';
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false ? '' : CodeUtil.getBlank(depth) + '$' + name + ' = json_decode($resultJson, true); \n';
       },
 
       onParseParentEnd: function () {
@@ -1750,18 +1932,31 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
       onParseChildOther: function (key, value, index) {
 
         if (value instanceof Array) {
-          log(CodeUtil.TAG, 'parsePHPResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parsePHPResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray 不存在！');
+          }
 
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
-          log(CodeUtil.TAG, 'parsePHPResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parsePHPResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
 
           return this.onParseJSONObject(key, value, index);
         }
@@ -1773,13 +1968,13 @@ var CodeUtil = {
           + padding + 'echo (' + quote + (isSmart ? '' : '\\') + '$' + name + '->' + (isSmart ? '' : '\\') + '$' + varName + ' = ' + quote + ' . $' + varName + ');';
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        const value = (__value as Array<any>) || [];
 
-        var padding = '\n' + CodeUtil.getBlank(depth);
+        var padding      = '\n' + CodeUtil.getBlank(depth);
         var innerPadding = padding + CodeUtil.getBlank(1);
 
-        var k = JSONResponse.getVariableName(key);
+        var k        = JSONResponse.getVariableName(key);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
 
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
@@ -1796,8 +1991,7 @@ var CodeUtil = {
         var indexName = 'i' + (depth <= 0 ? '' : depth);
         if (isSmart) {
           s += padding + 'foreach ($' + k + ' as $' + indexName + ' => $' + itemName + ') {';
-        }
-        else {
+        } else {
           s += padding + 'for (' + '$' + indexName + ' = 0; $' + indexName + ' < count($' + k + '); $' + indexName + '++) {';
           s += innerPadding + '$' + itemName + ' = $' + k + '[$' + indexName + '];';
         }
@@ -1823,11 +2017,11 @@ var CodeUtil = {
 
       onParseJSONObject: function (key, value, index) {
         var padding = '\n' + CodeUtil.getBlank(depth);
-        var k = JSONResponse.getVariableName(key);
+        var k       = JSONResponse.getVariableName(key);
 
         var s = '\n' + padding + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += padding + '$' + k + ' = $' + name + '[' + quote + key + quote + '];'
+        s += padding + '$' + k + ' = $' + name + '[' + quote + key + quote + '];';
         s += padding + 'if ($' + k + ' === null) {';
         s += padding + blank + '$' + k + ' = (object) ' + (isSmart ? '[];' : 'array();');
         s += padding + '}\n';
@@ -1838,33 +2032,33 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    });
 
   },
 
   /**生成 Web-Go 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @param isSmart
    * @return parseCode
    */
-  parseGoResponse: function(name_, resObj, depth, isSmart) {
+  parseGoResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isSmart: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
 
-    var quote = '"'
+    var quote = '"';
 
     return CodeUtil.parseCode(name, resObj, {
 
       onParseParentStart: function () {
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false
           ? ''
           : CodeUtil.getBlank(depth) + name + ' := map[string]interface{} {} \n'
           + CodeUtil.getBlank(depth) + 'json.NewDecoder(bytes.NewBuffer(response.Body)).Decode(&' + name + ') \n';
@@ -1879,23 +2073,36 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
       onParseChildOther: function (key, value, index) {
 
         if (value instanceof Array) {
-          log(CodeUtil.TAG, 'parseGoResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseGoResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray 不存在！');
+          }
 
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
-          log(CodeUtil.TAG, 'parseGoResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseGoResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
 
           return this.onParseJSONObject(key, value, index);
         }
 
-        var type = CodeUtil.getGoTypeFromJS(key, value);
+        var type    = CodeUtil.getGoTypeFromJS(key, value);
         var padding = '\n' + CodeUtil.getBlank(depth);
         var varName = JSONResponse.getVariableName(key);
 
@@ -1903,13 +2110,13 @@ var CodeUtil = {
           + padding + 'log.Println("' + name + '.' + varName + ' = " + string(' + varName + '))';
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        const value = (__value as Array<any>) || [];
 
-        var padding = '\n' + CodeUtil.getBlank(depth);
+        var padding      = '\n' + CodeUtil.getBlank(depth);
         var innerPadding = padding + CodeUtil.getBlank(1);
 
-        var k = JSONResponse.getVariableName(key);
+        var k        = JSONResponse.getVariableName(key);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
 
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
@@ -1917,7 +2124,7 @@ var CodeUtil = {
 
         var s = '\n' + padding + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += padding + k + ' := ' + name + '[' + quote + key + quote + '].([]interface{})'
+        s += padding + k + ' := ' + name + '[' + quote + key + quote + '].([]interface{})';
         s += padding + 'if ' + k + ' == nil {';
         s += padding + '    ' + k + ' = []interface{} {}';
         s += padding + '}\n';
@@ -1949,11 +2156,11 @@ var CodeUtil = {
 
       onParseJSONObject: function (key, value, index) {
         var padding = '\n' + CodeUtil.getBlank(depth);
-        var k = JSONResponse.getVariableName(key);
+        var k       = JSONResponse.getVariableName(key);
 
         var s = '\n' + padding + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += padding + k + ' := ' + name + '[' + quote + key + quote + '].(map[string]interface{})'
+        s += padding + k + ' := ' + name + '[' + quote + key + quote + '].(map[string]interface{})';
         s += padding + 'if ' + k + ' == nil {';
         s += padding + '    ' + k + ' = map[string]interface{} {}';
         s += padding + '}\n';
@@ -1964,37 +2171,37 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    });
 
   },
 
   /**生成 Web-C++ 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @param isSmart
    * @return parseCode
    */
-  parseCppResponse: function(name_, resObj, depth, isSmart) {
+  parseCppResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isSmart: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
 
-    var tab = CodeUtil.getBlank(1);
-    var blockBlank = tab.substring(1);
-    var padding = '\n' + CodeUtil.getBlank(depth);
-    var nextPadding = padding + tab;
+    var tab             = CodeUtil.getBlank(1);
+    var blockBlank      = tab.substring(1);
+    var padding         = '\n' + CodeUtil.getBlank(depth);
+    var nextPadding     = padding + tab;
     var nextNextPadding = nextPadding + tab;
 
     return CodeUtil.parseCode(name, resObj, {
 
       onParseParentStart: function () {
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false
           ? '' : padding + 'rapidjson::Document response;' + padding + 'response.Parse(resultJson);\n';
       },
 
@@ -2007,37 +2214,54 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
       onParseChildOther: function (key, value, index) {
 
+        // if (value == null) {
+        //   throw new Error('value为null');
+        // }
+
         if (value instanceof Array) {
-          log(CodeUtil.TAG, 'parseCppResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseCppResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray 不存在！');
+          }
 
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
-          log(CodeUtil.TAG, 'parseCppResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseCppResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
 
           return this.onParseJSONObject(key, value, index);
         }
 
-        var type = CodeUtil.getCppTypeFromJS(key, value);
-        var getter = CodeUtil.getCppGetterFromJS(key, value);
+        var type    = CodeUtil.getCppTypeFromJS(key, value);
+        var getter  = CodeUtil.getCppGetterFromJS(key, value);
         var padding = '\n' + CodeUtil.getBlank(depth);
         var varName = JSONResponse.getVariableName(key);
 
         return padding + 'rapidjson::Value& ' + varName + 'Value = ' + name + '["' + key + '"];'
           + padding + type + ' ' + varName + ' = ' + varName + 'Value.IsNull() ? NULL : ' + varName + 'Value.' + getter + '();'
           + padding + 'std::cout << "' + name + '.' + varName
-          + ' = " << ' + varName + (value instanceof Object ? '.GetString()' : '') + ' << std::endl;';
+          + ' = " << ' + varName + ((value as any) instanceof Object ? '.GetString()' : '') + ' << std::endl;';
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        const value = (__value as Array<any>) || [];
 
-        var k = JSONResponse.getVariableName(key);
+        var k        = JSONResponse.getVariableName(key);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
 
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
@@ -2057,8 +2281,7 @@ var CodeUtil = {
           s += nextPadding + 'int ' + indexName + ' = -1;';
           s += nextPadding + 'for (rapidjson::Value& ' + itemName + 'Value : ' + k + ') {';
           s += nextNextPadding + indexName + ' ++;';
-        }
-        else {
+        } else {
           s += nextPadding + 'for (int ' + indexName + ' = 0; ' + indexName + ' < ' + k + '.Size(); ' + indexName + '++) {';
           s += nextNextPadding + 'rapidjson::Value& ' + itemName + 'Value = ' + k + '[' + indexName + '];';
         }
@@ -2067,7 +2290,7 @@ var CodeUtil = {
         s += nextNextPadding + tab + 'continue;';
         s += nextNextPadding + '}';
 
-        var itemType = CodeUtil.getCppTypeFromJS(key, value[0], true);
+        var itemType   = CodeUtil.getCppTypeFromJS(key, value[0], true);
         var itemGetter = CodeUtil.getCppGetterFromJS(key, value[0], true);
         s += nextNextPadding + itemType + ' ' + itemName + ' = ' + itemName + 'Value.' + itemGetter + '();';
 
@@ -2092,7 +2315,7 @@ var CodeUtil = {
 
         var s = '\n' + padding + '{' + blockBlank + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += nextPadding + 'rapidjson::Value& ' + k + 'Value = ' + name + '["' + key + '"];'
+        s += nextPadding + 'rapidjson::Value& ' + k + 'Value = ' + name + '["' + key + '"];';
         s += nextPadding + 'if (' + k + 'Value.IsNull()) {';
         s += nextNextPadding + k + 'Value.SetObject();';
         s += nextPadding + '}';
@@ -2104,34 +2327,33 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    });
 
   },
 
 
   /**生成 Web-Python 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @param isSmart
    * @return parseCode
    */
-  parsePythonResponse: function(name_, resObj, depth, isSmart) {
+  parsePythonResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isSmart: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
 
-    var quote = "'";
-
-    return CodeUtil.parseCode(name, resObj, {
+    var quote                    = '\'';
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () { //解决生成多余的解析最外层的初始化代码
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false ? '' : CodeUtil.getBlank(depth) + name + (isSmart ? '' : ': dict') + ' = json.loads(resultJson) \n';
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false ? '' : CodeUtil.getBlank(depth) + name + (isSmart ? '' : ': dict') + ' = json.loads(resultJson) \n';
       },
 
       onParseParentEnd: function () {
@@ -2143,23 +2365,36 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
       onParseChildOther: function (key, value, index) {
 
         if (value instanceof Array) {
-          log(CodeUtil.TAG, 'parsePythonResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parsePythonResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray 不存在！');
+          }
 
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
-          log(CodeUtil.TAG, 'parsePythonResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parsePythonResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
 
           return this.onParseJSONObject(key, value, index);
         }
 
-        var type = value == null ? 'any' : CodeUtil.getPythonTypeFromJS(key, value);
+        var type    = value == null ? 'any' : CodeUtil.getPythonTypeFromJS(key, value);
         var padding = '\n' + CodeUtil.getBlank(depth);
         var varName = JSONResponse.getVariableName(key);
 
@@ -2168,13 +2403,13 @@ var CodeUtil = {
           + padding + 'self.assertEqual(' + varName + ', ' + CodeUtil.getCode4Value(CodeUtil.LANGUAGE_PYTHON, value, key) + ')\n';
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        const value = (__value as Array<any>) || [];
 
-        var padding = '\n' + CodeUtil.getBlank(depth);
+        var padding      = '\n' + CodeUtil.getBlank(depth);
         var innerPadding = padding + CodeUtil.getBlank(1);
 
-        var k = JSONResponse.getVariableName(key, 'array');
+        var k        = JSONResponse.getVariableName(key, 'array');
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
 
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
@@ -2183,7 +2418,7 @@ var CodeUtil = {
         var s = '\n' + padding + '# ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
         //不支持 varname: list[int] 这种语法   s += padding + k + (isSmart ? '' : ': list[' + type + ']') + ' = ' + name + '[' + quote + key + quote + ']'
-        s += padding + k + (isSmart ? '' : ': list') + ' = ' + name + '[' + quote + key + quote + ']'
+        s += padding + k + (isSmart ? '' : ': list') + ' = ' + name + '[' + quote + key + quote + ']';
         s += padding + '# self.assertIsNotNone(' + k + ')';
         s += padding + 'if ' + k + ' == None:';
         s += padding + '    ' + k + ' = []\n';
@@ -2214,11 +2449,11 @@ var CodeUtil = {
 
       onParseJSONObject: function (key, value, index) {
         var padding = '\n' + CodeUtil.getBlank(depth);
-        var k = JSONResponse.getVariableName(key);
+        var k       = JSONResponse.getVariableName(key);
 
         var s = '\n' + padding + '# ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += padding + k + (isSmart ? '' : ': dict') + ' = ' + name + '[' + quote + key + quote + ']'
+        s += padding + k + (isSmart ? '' : ': dict') + ' = ' + name + '[' + quote + key + quote + ']';
         s += padding + '# self.assertIsNotNone(' + k + ')';
         s += padding + 'if ' + k + ' == None:';
         s += padding + '    ' + k + ' = {}\n';
@@ -2229,34 +2464,34 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    };
+    return CodeUtil.parseCode(name, resObj, cb);
 
   },
 
   /**生成 Web-TypeScript 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @param isSmart
    * @return parseCode
    */
-  parseTypeScriptResponse: function(name_, resObj, depth, isSmart) {
+  parseTypeScriptResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isSmart: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
 
-    var varKey = isSmart ? 'let' : 'var'
-    var quote = isSmart ? "'" : '"'
-
-    return CodeUtil.parseCode(name, resObj, {
+    var varKey                   = isSmart ? 'let' : 'var';
+    var quote                    = isSmart ? '\'' : '"';
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false ? '' : CodeUtil.getBlank(depth) + varKey + ' ' + name + ': object = JSON.parse(resultJson); \n';
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false ? '' : CodeUtil.getBlank(depth) + varKey + ' ' + name + ': object = JSON.parse(resultJson); \n';
       },
 
       onParseParentEnd: function () {
@@ -2268,23 +2503,36 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
       onParseChildOther: function (key, value, index) {
 
         if (value instanceof Array) {
-          log(CodeUtil.TAG, 'parseTypeScriptResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseTypeScriptResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray 不存在！');
+          }
 
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
-          log(CodeUtil.TAG, 'parseTypeScriptResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseTypeScriptResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
 
           return this.onParseJSONObject(key, value, index);
         }
 
-        var type = value == null ? 'any' : (typeof value);
+        var type    = value == null ? 'any' : (typeof value);
         var padding = '\n' + CodeUtil.getBlank(depth);
         var varName = JSONResponse.getVariableName(key);
 
@@ -2292,13 +2540,13 @@ var CodeUtil = {
           + padding + 'console.log("' + name + '.' + varName + ' = " + ' + varName + ');';
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        const value = (__value as Array<any>) || [];
 
-        var padding = '\n' + CodeUtil.getBlank(depth);
+        var padding      = '\n' + CodeUtil.getBlank(depth);
         var innerPadding = padding + CodeUtil.getBlank(1);
 
-        var k = JSONResponse.getVariableName(key);
+        var k        = JSONResponse.getVariableName(key);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
 
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
@@ -2306,7 +2554,7 @@ var CodeUtil = {
 
         var s = '\n' + padding + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += padding + varKey + ' ' + k + ': ' + type + '[] = ' + name + '[' + quote + key + quote + ']' + ' || []; \n'
+        s += padding + varKey + ' ' + k + ': ' + type + '[] = ' + name + '[' + quote + key + quote + ']' + ' || []; \n';
 
         s += '\n' + padding + '// TODO 把这段代码抽取一个函数，以免for循环嵌套时 i 冲突 或 id等其它字段冲突';
 
@@ -2337,11 +2585,11 @@ var CodeUtil = {
 
       onParseJSONObject: function (key, value, index) {
         var padding = '\n' + CodeUtil.getBlank(depth);
-        var k = JSONResponse.getVariableName(key);
+        var k       = JSONResponse.getVariableName(key);
 
         var s = '\n' + padding + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += padding + varKey + ' ' + k + ': object = ' + name + '[' + quote + key + quote + ']' + ' || {}; \n'
+        s += padding + varKey + ' ' + k + ': object = ' + name + '[' + quote + key + quote + ']' + ' || {}; \n';
 
         s += CodeUtil.parseTypeScriptResponse(k, value, depth, isSmart);
 
@@ -2349,40 +2597,41 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    };
+    return CodeUtil.parseCode(name, resObj, cb);
 
   },
 
   /**生成 Android-Kotlin 解析 Response JSON 的代码
    * 不能像 Java 那样执行 {} 代码段里的代码，所以不能用 Java 那种代码段隔离的方式
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @return parseCode
    */
-  parseKotlinResponse: function(name_, resObj, depth, isTable, isSmart) {
+  parseKotlinResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isTable: boolean, isSmart: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
 
-    var tab = CodeUtil.getBlank(1);
-    var blockBlank = tab.substring(1);
-    var padding = '\n' + CodeUtil.getBlank(depth);
-    var nextPadding = padding + tab;
+    var tab             = CodeUtil.getBlank(1);
+    var blockBlank      = tab.substring(1);
+    var padding         = '\n' + CodeUtil.getBlank(depth);
+    var nextPadding     = padding + tab;
     var nextNextPadding = nextPadding + tab;
 
-    return CodeUtil.parseCode(name, resObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
         // if (isSmart) { //导致里面的 [] 等字符全都转成 List 等，里面每用一个 key 取值都得 formatArrayKey 或所有对象类型用 JSONReseponse 等，不通用
         //  return depth > 0 ? '' : CodeUtil.getBlank(depth) + 'JSONResponse ' + name + ' = new JSONResponse(resultJson);\n';
         // }
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false ? '' : CodeUtil.getBlank(depth) + 'var ' + name + ': JSONObject = JSON.parseObject(resultJson)\n';
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false ? '' : CodeUtil.getBlank(depth) + 'var ' + name + ': JSONObject = JSON.parseObject(resultJson)\n';
       },
 
       onParseParentEnd: function () {
@@ -2394,6 +2643,11 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
@@ -2402,10 +2656,18 @@ var CodeUtil = {
         if (value instanceof Array) {
           log(CodeUtil.TAG, 'parseKotlinResponse  for typeof value === "array" >>  ');
 
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray 不存在！');
+          }
+
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
           log(CodeUtil.TAG, 'parseKotlinResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
 
           return this.onParseJSONObject(key, value, index);
         }
@@ -2426,11 +2688,11 @@ var CodeUtil = {
         }
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        const value = (__value as Array<any>) || [];
 
-        var vn = JSONResponse.getVariableName(key);
-        var k = vn + (depth <= 0 ? '' : depth);
+        var vn       = JSONResponse.getVariableName(key);
+        var k        = vn + (depth <= 0 ? '' : depth);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
 
@@ -2442,18 +2704,21 @@ var CodeUtil = {
         var s = '\n' + padding + 'run {' + blockBlank + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
         var t = JSONResponse.getTableName(key);
+
+        if (t == null) {
+          throw new Error('t为null！');
+        }
+
         if (t.endsWith('[]')) {
           t = t.substring(0, t.length - 2);
         }
 
         var isTableKey = JSONObject.isTableKey(t);
         if (isTable && isSmart) {
-          s += nextPadding + 'var ' + k + ': List<' + (isTableKey ? t : type) + '?>? = ' + name + '?.get' + StringUtil.firstCase(vn, true) + '()'
-        }
-        else if (isTableKey && isSmart) {
+          s += nextPadding + 'var ' + k + ': List<' + (isTableKey ? t : type) + '?>? = ' + name + '?.get' + StringUtil.firstCase(vn, true) + '()';
+        } else if (isTableKey && isSmart) {
           s += nextPadding + 'var ' + k + ': List<' + t + '?>? = JSON.parseArray(' + name + '?.getString("' + key + '"), ' + t + '::class.java)';
-        }
-        else {
+        } else {
           s += nextPadding + 'var ' + k + ': JSONArray? = ' + name + '?.getJSONArray("' + key + '")';
         }
 
@@ -2491,16 +2756,14 @@ var CodeUtil = {
 
         var s = '\n' + padding + 'run {' + blockBlank + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        var t = JSONResponse.getTableName(key);
+        var t          = JSONResponse.getTableName(key);
         var isTableKey = JSONObject.isTableKey(t);
         if (isTable && isSmart) {
-          s += nextPadding + 'var ' + k + ':' + (isTableKey ? t : 'JSONObject') + '? = ' + name + '?.get' + StringUtil.firstCase(k, true) + '()'
-        }
-        else if (isTableKey && isSmart) {
+          s += nextPadding + 'var ' + k + ':' + (isTableKey ? t : 'JSONObject') + '? = ' + name + '?.get' + StringUtil.firstCase(k, true) + '()';
+        } else if (isTableKey && isSmart) {
           s += nextPadding + 'var ' + k + ':' + t + '? = ' + name + '?.getObject("' + key + '", ' + t + '::class.java)';
-        }
-        else {
-          s += nextPadding + 'var ' + k + ': JSONObject? = ' + name + '?.getJSONObject("' + key + '")'
+        } else {
+          s += nextPadding + 'var ' + k + ': JSONObject? = ' + name + '?.getJSONObject("' + key + '")';
         }
 
         s += nextPadding + 'if (' + k + ' == null) {';
@@ -2513,33 +2776,34 @@ var CodeUtil = {
 
         return s;
       }
-    }) + (depth > 0 || ! isSmart ? '' : '\n\n\n' + CodeUtil.parseKotlinClasses('Response', resObj, 0, false, true))
+    };
+    return CodeUtil.parseCode(name, resObj, cb) + (depth > 0 || !isSmart ? '' : '\n\n\n' + CodeUtil.parseKotlinClasses('Response', resObj, 0, false, true));
 
   },
 
 
   /**生成 Android-Java 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @param isTable
    * @param isSmart
    * @return parseCode
    */
-  parseJavaResponse: function(name_, resObj, depth, isTable, isSmart, onlyParseSimpleValue) {
+  parseJavaResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isTable: boolean, isSmart: boolean, onlyParseSimpleValue?: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
 
-    var tab = CodeUtil.getBlank(1);
-    var blockBlank = tab.substring(1);
-    var padding = '\n' + CodeUtil.getBlank(depth);
-    var nextPadding = padding + tab;
+    var tab             = CodeUtil.getBlank(1);
+    var blockBlank      = tab.substring(1);
+    var padding         = '\n' + CodeUtil.getBlank(depth);
+    var nextPadding     = padding + tab;
     var nextNextPadding = nextPadding + tab;
 
     return CodeUtil.parseCode(name, resObj, {
@@ -2548,7 +2812,7 @@ var CodeUtil = {
         // if (isSmart) { //导致里面的 [] 等字符全都转成 List 等，里面每用一个 key 取值都得 formatArrayKey 或所有对象类型用 JSONReseponse 等，不通用
         //  return depth > 0 ? '' : CodeUtil.getBlank(depth) + 'JSONResponse ' + name + ' = new JSONResponse(resultJson);\n';
         // }
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false ? '' : padding + 'JSONObject ' + name + ' = JSON.parseObject(resultJson);\n';
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false ? '' : padding + 'JSONObject ' + name + ' = JSON.parseObject(resultJson);\n';
       },
 
       onParseParentEnd: function () {
@@ -2566,6 +2830,11 @@ var CodeUtil = {
         if (onlyParseSimpleValue) {
           return this.onParseChildOther(key, value, index);
         }
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
@@ -2573,18 +2842,26 @@ var CodeUtil = {
 
         if (onlyParseSimpleValue != true) {
           if (value instanceof Array) {
-            log(CodeUtil.TAG, 'parseJavaResponse  for typeof value === "array" >>  ' );
+            log(CodeUtil.TAG, 'parseJavaResponse  for typeof value === "array" >>  ');
+
+            if (!('onParseJSONArray' in this)) {
+              throw new Error('onParseJSONArray 不存在！');
+            }
 
             return this.onParseJSONArray(key, value, index);
           }
           if (value instanceof Object) {
-            log(CodeUtil.TAG, 'parseJavaResponse  for typeof value === "array" >>  ' );
+            log(CodeUtil.TAG, 'parseJavaResponse  for typeof value === "array" >>  ');
+
+            if (!('onParseJSONObject' in this)) {
+              throw new Error('onParseJSONObject 不存在！');
+            }
 
             return this.onParseJSONObject(key, value, index);
           }
         }
 
-        var type = CodeUtil.getJavaTypeFromJS(key, value, false, ! onlyParseSimpleValue);
+        var type    = CodeUtil.getJavaTypeFromJS(key, value, false, !onlyParseSimpleValue);
         var varName = JSONResponse.getVariableName(key);
 
         if (isSmart && isTable) { // JSONObject.isTableKey(name)) {
@@ -2597,21 +2874,26 @@ var CodeUtil = {
         }
       },
 
-      onParseJSONArray: function (key, value, index) {
+      onParseJSONArray: function (key, __value, index) {
         if (onlyParseSimpleValue) {
-          return this.onParseChildOther(key, value, index);
+          return this.onParseChildOther(key, __value, index);
         }
 
-        value = value || []
+        const value = (__value as Array<any>) || [];
 
-        var vn = JSONResponse.getVariableName(key);
-        var k = vn + (depth <= 0 ? '' : depth);
+        var vn       = JSONResponse.getVariableName(key);
+        var k        = vn + (depth <= 0 ? '' : depth);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
 
         var s = '\n' + padding + '{' + blockBlank + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
         var t = JSONResponse.getTableName(key);
+
+        if (t == null) {
+          throw new Error('t为null！');
+        }
+
         if (t.endsWith('[]')) {
           t = t.substring(0, t.length - 2);
         }
@@ -2620,12 +2902,10 @@ var CodeUtil = {
 
         var itemType = CodeUtil.getJavaTypeFromJS(itemName, value[0], false);
         if (isTable && isSmart) {
-          s += nextPadding + 'List<' + (isTableKey ? t : itemType) + '> ' + k + ' = ' + name + '.get' + StringUtil.firstCase(vn, true) + '();'
-        }
-        else if (isTableKey && isSmart) {
+          s += nextPadding + 'List<' + (isTableKey ? t : itemType) + '> ' + k + ' = ' + name + '.get' + StringUtil.firstCase(vn, true) + '();';
+        } else if (isTableKey && isSmart) {
           s += nextPadding + 'List<' + t + '> ' + k + ' = JSON.parseArray(' + name + '.getString("' + key + '"), ' + t + '.class);';
-        }
-        else {
+        } else {
           s += nextPadding + 'JSONArray ' + k + ' = ' + name + '.getJSONArray("' + key + '");';
         }
         s += nextPadding + 'if (' + k + ' == null) {';
@@ -2665,16 +2945,14 @@ var CodeUtil = {
 
         var s = '\n' + padding + '{' + blockBlank + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        var t = JSONResponse.getTableName(key);
+        var t          = JSONResponse.getTableName(key);
         var isTableKey = JSONObject.isTableKey(t);
         if (isTable && isSmart) {
-          s += nextPadding + (isTableKey ? t : 'JSONObject') + ' ' + k + ' = ' + name + '.get' + StringUtil.firstCase(k, true) + '();'
-        }
-        else if (isTableKey && isSmart) {
-          s += nextPadding + t + ' ' + k + ' = ' + name + '.getObject("' + key + '", ' + t + '.class);'
-        }
-        else {
-          s += nextPadding + 'JSONObject ' + k + ' = ' + name + '.getJSONObject("' + key + '");'
+          s += nextPadding + (isTableKey ? t : 'JSONObject') + ' ' + k + ' = ' + name + '.get' + StringUtil.firstCase(k, true) + '();';
+        } else if (isTableKey && isSmart) {
+          s += nextPadding + t + ' ' + k + ' = ' + name + '.getObject("' + key + '", ' + t + '.class);';
+        } else {
+          s += nextPadding + 'JSONObject ' + k + ' = ' + name + '.getJSONObject("' + key + '");';
         }
         s += nextPadding + 'if (' + k + ' == null) {';
         s += nextNextPadding + k + ' = new ' + (isTableKey && isSmart ? t : 'JSONObject') + '();';
@@ -2686,23 +2964,23 @@ var CodeUtil = {
 
         return s;
       }
-    }) + (depth > 0 || ! isSmart ? '' : '\n\n\n' + CodeUtil.parseKotlinClasses('Response', resObj, 0, false, ! isSmart))
+    }) + (depth > 0 || !isSmart ? '' : '\n\n\n' + CodeUtil.parseKotlinClasses('Response', resObj, 0, false, !isSmart));
 
   },
 
 
   /**生成 Unity3D-C# 解析 Response JSON 的代码
-   * @param name_
+   * @param __name
    * @param resObj
    * @param depth
    * @return parseCode
    */
-  parseCSharpResponse: function(name_, resObj, depth) {
+  parseCSharpResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
-    var name = name_; //解决生成多余的解析最外层的初始化代码
+    var name = __name; //解决生成多余的解析最外层的初始化代码
     if (StringUtil.isEmpty(name, true)) {
       name = 'response';
     }
@@ -2711,7 +2989,7 @@ var CodeUtil = {
     return CodeUtil.parseCode(name, resObj, {
 
       onParseParentStart: function () {
-        return depth > 0 || StringUtil.isEmpty(name_, true) == false ? '' : CodeUtil.getBlank(depth) + 'JObject ' + name + ' = JObject.Parse(resultJson);\n';
+        return depth > 0 || StringUtil.isEmpty(__name, true) == false ? '' : CodeUtil.getBlank(depth) + 'JObject ' + name + ' = JObject.Parse(resultJson);\n';
       },
 
       onParseParentEnd: function () {
@@ -2723,23 +3001,36 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
       onParseChildOther: function (key, value, index) {
 
         if (value instanceof Array) {
-          log(CodeUtil.TAG, 'parseCSharpResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseCSharpResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray 不存在！');
+          }
 
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
-          log(CodeUtil.TAG, 'parseCSharpResponse  for typeof value === "array" >>  ' );
+          log(CodeUtil.TAG, 'parseCSharpResponse  for typeof value === "array" >>  ');
+
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
 
           return this.onParseJSONObject(key, value, index);
         }
 
-        var type = CodeUtil.getCSharpTypeFromJS(key, value);
+        var type    = CodeUtil.getCSharpTypeFromJS(key, value);
         var padding = '\n' + CodeUtil.getBlank(depth);
         var varName = JSONResponse.getVariableName(key);
 
@@ -2748,14 +3039,14 @@ var CodeUtil = {
           + padding + 'Console.WriteLine("' + name + '.' + varName + ' = " + ' + varName + ');';
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        const value = (__value as Array<any>) || [];
 
-        var padding = '\n' + CodeUtil.getBlank(depth);
-        var innerPadding = '\n' + CodeUtil.getBlank(depth + 1);
+        var padding       = '\n' + CodeUtil.getBlank(depth);
+        var innerPadding  = '\n' + CodeUtil.getBlank(depth + 1);
         var innerPadding2 = '\n' + CodeUtil.getBlank(depth + 2);
 
-        var k = JSONResponse.getVariableName(key) + (depth <= 0 ? '' : depth);
+        var k        = JSONResponse.getVariableName(key) + (depth <= 0 ? '' : depth);
         var itemName = StringUtil.addSuffix(k, 'Item') + (depth <= 0 ? '' : depth);
 
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
@@ -2792,13 +3083,13 @@ var CodeUtil = {
       },
 
       onParseJSONObject: function (key, value, index) {
-        var padding = '\n' + CodeUtil.getBlank(depth);
+        var padding      = '\n' + CodeUtil.getBlank(depth);
         var innerPadding = '\n' + CodeUtil.getBlank(depth + 1);
-        var k = JSONResponse.getVariableName(key);
+        var k            = JSONResponse.getVariableName(key);
 
         var s = '\n' + padding + '{   // ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
 
-        s += innerPadding + 'JObject ' + k + ' = ' + name + '["' + key + '"].ToObject<JObject>();'
+        s += innerPadding + 'JObject ' + k + ' = ' + name + '["' + key + '"].ToObject<JObject>();';
         s += innerPadding + 'if (' + k + ' == null) {';
         s += innerPadding + blank + k + ' = new JObject();';
         s += innerPadding + '}\n';
@@ -2809,15 +3100,14 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    });
 
   },
 
 
-
-  initEmptyValue4Type: function(type, isSmart, isKotlin) {
+  initEmptyValue4Type: function (type: null | string, isSmart: boolean, isKotlin: boolean): string {
     if (isSmart) {
-      type = type || ''
+      type = type || '';
       switch (type) {
         case 'Boolean':
           return ' = false';
@@ -2849,18 +3139,17 @@ var CodeUtil = {
     return '? = null' + (isSmart ? '' : '  //' + CodeUtil.initEmptyValue4Type(type, true, isKotlin));
   },
 
-  getCode4JavaArgValues: function (reqObj, useVar4ComplexValue) {
+  getCode4JavaArgValues: function (reqObj: TypeNS.ValueType, useVar4ComplexValue: boolean) {
     var str = '';
     if (reqObj != null) {
       var first = true;
 
-      for (var k in reqObj) {
-        var v = reqObj[k];
+      for (var k in (reqObj as IndexedObj)) {
+        var v = (reqObj as IndexedObj)[k];
 
         if (useVar4ComplexValue && v instanceof Object) {
           str += (first ? '' : ', ') + JSONResponse.getVariableName(k);
-        }
-        else {
+        } else {
           str += (first ? '' : ', ') + CodeUtil.getCode4Value(CodeUtil.LANGUAGE_JAVA, v, k, 0);
         }
         first = false;
@@ -2870,18 +3159,17 @@ var CodeUtil = {
     return str;
   },
 
-  getCode4KotlinArgValues: function (reqObj, useVar4ComplexValue) {
+  getCode4KotlinArgValues: function (reqObj: TypeNS.ValueType, useVar4ComplexValue: boolean) {
     var str = '';
     if (reqObj != null) {
       var first = true;
 
-      for (var k in reqObj) {
-        var v = reqObj[k];
+      for (var k in (reqObj as IndexedObj)) {
+        var v = (reqObj as IndexedObj)[k];
 
         if (useVar4ComplexValue && v instanceof Object) {
           str += (first ? '' : ', ') + JSONResponse.getVariableName(k);
-        }
-        else {
+        } else {
           str += (first ? '' : ', ') + CodeUtil.getCode4Value(CodeUtil.LANGUAGE_KOTLIN, v, k, 0);
         }
         first = false;
@@ -2897,13 +3185,16 @@ var CodeUtil = {
    * @param rawType true-使用 JDK 有的原始类型，其它-使用 JSONObject, JSONRequest 等第三方库封装类型
    * @param complex2String 将复杂类型转为 String，值转为 toJSONString
    */
-  getCode4JavaArgs: function(reqObj, withType, annotationType, rawType, complex2String) {
+  getCode4JavaArgs       : function (
+    reqObj: TypeNS.ValueType, withType: boolean, annotationType: null | string, rawType: boolean, complex2String?: boolean,
+    unkonw_param?: boolean,    // 不知道做啥用的？
+  ) {
     var str = '';
     if (reqObj != null) {
       var first = true;
 
-      for (var k in reqObj) {
-        var v = reqObj[k];
+      for (var k in (reqObj as IndexedObj)) {
+        var v = (reqObj as IndexedObj)[k];
         var t = withType ? CodeUtil.getJavaTypeFromJS(k, v, false, false, rawType) : null;
 
         var at = annotationType;
@@ -2919,13 +3210,12 @@ var CodeUtil = {
         if (complex2String && v instanceof Object) {
           if (withType) {
             t = 'String';
-          }
-          else {
+          } else {
             vk = 'JSON.toJSONString(' + vk + ')';
           }
         }
 
-        str += (first ? '' : ', ') + (at == null ? '' : '@' + at + '("' + k + '") ' ) + (t == null ? '' : t + ' ') + vk;
+        str += (first ? '' : ', ') + (at == null ? '' : '@' + at + '("' + k + '") ') + (t == null ? '' : t + ' ') + vk;
         first = false;
       }
     }
@@ -2939,13 +3229,13 @@ var CodeUtil = {
    * @param rawType true-使用 JDK 有的原始类型，其它-使用 JSONObject, JSONRequest 等第三方库封装类型
    * @param complex2String 将复杂类型转为 String，值转为 toJSONString
    */
-  getCode4KotlinArgs: function(reqObj, withType, annotationType, rawType, isSmart, complex2String) {
+  getCode4KotlinArgs     : function (reqObj: TypeNS.ValueType, withType: boolean, annotationType: null | string, rawType: boolean, isSmart: boolean, complex2String: boolean) {
     var str = '';
     if (reqObj != null) {
       var first = true;
 
-      for (var k in reqObj) {
-        var v = reqObj[k];
+      for (var k in (reqObj as IndexedObj)) {
+        var v = (reqObj as IndexedObj)[k];
         var t = withType ? CodeUtil.getKotlinTypeFromJS(k, v, false, false, rawType, isSmart) : null;
 
         var at = annotationType;
@@ -2961,13 +3251,12 @@ var CodeUtil = {
         if (complex2String && v instanceof Object) {
           if (withType) {
             t = 'String';
-          }
-          else {
+          } else {
             vk = 'JSON.toJSONString(' + vk + ')';
           }
         }
 
-        str += (first ? '' : ', ') + (at == null ? '' : '@' + at + '("' + k + '") ' ) + vk + (t == null ? '' : ': ' + t + '?');
+        str += (first ? '' : ', ') + (at == null ? '' : '@' + at + '("' + k + '") ') + vk + (t == null ? '' : ': ' + t + '?');
         first = false;
       }
     }
@@ -2984,21 +3273,21 @@ var CodeUtil = {
    * @param depth
    * @return parseCode
    */
-  parseKotlinClasses: function(name, resObj, depth, isTable, isSmart) {
+  parseKotlinClasses: function (name: string, resObj: TypeNS.ValueType, depth: number, isTable: boolean, isSmart: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
 
 
-    var tab = CodeUtil.getBlank(1);
-    var padding = CodeUtil.getBlank(depth);
+    var tab         = CodeUtil.getBlank(1);
+    var padding     = CodeUtil.getBlank(depth);
     var nextPadding = padding + tab;
 
-    return CodeUtil.parseCode(name, resObj, {
+    const cb: TypeNS.ParseCodeCb = {
 
       onParseParentStart: function () {
         if (StringUtil.isEmpty(name, true)) {
-          return ''
+          return '';
         }
 
         var s = '\n';
@@ -3026,6 +3315,11 @@ var CodeUtil = {
       },
 
       onParseChildObject: function (key, value, index) {
+
+        if (!('onParseJSONObject' in this)) {
+          throw new Error('onParseJSONObject 不存在！');
+        }
+
         return this.onParseJSONObject(key, value, index);
       },
 
@@ -3034,15 +3328,23 @@ var CodeUtil = {
         if (value instanceof Array) {
           log(CodeUtil.TAG, 'parseKotlinResponse  for typeof value === "array" >>  ');
 
+          if (!('onParseJSONArray' in this)) {
+            throw new Error('onParseJSONArray 不存在！');
+          }
+
           return this.onParseJSONArray(key, value, index);
         }
         if (value instanceof Object) {
           log(CodeUtil.TAG, 'parseKotlinResponse  for typeof value === "array" >>  ');
 
+          if (!('onParseJSONObject' in this)) {
+            throw new Error('onParseJSONObject 不存在！');
+          }
+
           return this.onParseJSONObject(key, value, index);
         }
 
-        var type = CodeUtil.getKotlinTypeFromJS(key, value, false, false);
+        var type    = CodeUtil.getKotlinTypeFromJS(key, value, false, false);
         var varName = JSONResponse.getVariableName(key);
 
         var s = '\n\n' + nextPadding + '@SerializedName("' + key + '")'
@@ -3051,11 +3353,11 @@ var CodeUtil = {
         return s;
       },
 
-      onParseJSONArray: function (key, value, index) {
-        value = value || []
+      onParseJSONArray: function (key, __value, index) {
+        const value = (__value as IndexedObj) || [];
 
-        var vn = JSONResponse.getVariableName(key);
-        var k = vn + (depth <= 0 ? '' : depth);
+        var vn       = JSONResponse.getVariableName(key);
+        var k        = vn + (depth <= 0 ? '' : depth);
         var itemName = StringUtil.firstCase(k, true) + 'Item' + (depth <= 0 ? '' : depth);
         //还有其它字段冲突以及for循环的i冲突，解决不完的，只能让开发者自己抽出函数  var item = StringUtil.addSuffix(k, 'Item');
 
@@ -3063,10 +3365,13 @@ var CodeUtil = {
         s += '\n\n' + nextPadding + '@SerializedName("' + key + '")';
 
         var t = JSONResponse.getTableName(key);
-        var isAPIJSONArray = false
+        if (t == null) {
+          throw new Error('t为null！');
+        }
+        var isAPIJSONArray = false;
         if (t.endsWith('[]')) {
-          t = t.substring(0, t.length - 2);
-          isAPIJSONArray = true
+          t              = t.substring(0, t.length - 2);
+          isAPIJSONArray = true;
         }
         var isTableKey = JSONObject.isTableKey(t);
 
@@ -3088,14 +3393,17 @@ var CodeUtil = {
         var k = JSONResponse.getVariableName(key);
         var s = '\n\n' + nextPadding + '// ' + key + ' <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<';
         var t = JSONResponse.getTableName(key);
+        if (t == null) {
+          throw new Error('t为null！');
+        }
         var isAPIJSONArray = false;
         if (t.endsWith('[]')) {
-          t = t.substring(0, t.length - 2);
+          t              = t.substring(0, t.length - 2);
           isAPIJSONArray = true;
         }
         var isTableKey = JSONObject.isTableKey(t);
 
-        var type = (StringUtil.firstCase(t, true) || (isAPIJSONArray ? 'Item' : 'Any'))
+        var type = (StringUtil.firstCase(t, true) || (isAPIJSONArray ? 'Item' : 'Any'));
         s += '\n\n' + nextPadding + '@SerializedName("' + key + '")'
           + '\n' + nextPadding + 'open var ' + k + ': ' + type + CodeUtil.initEmptyValue4Type(type, isSmart, true)
           + CodeUtil.getComment(CodeUtil.getCommentFromDoc(CodeUtil.tableList, name, key, 'GET', CodeUtil.database, CodeUtil.language, true), false, '  ');
@@ -3109,11 +3417,10 @@ var CodeUtil = {
 
         return s;
       }
-    })
+    };
+    return CodeUtil.parseCode(name, resObj, cb);
 
   },
-
-
 
 
   /**生成 Server-Java API 相关代码
@@ -3123,18 +3430,18 @@ var CodeUtil = {
    * @param isSmart
    * @return
    */
-  parseJavaServer: function(type, url, database, schema, reqObj, isSmart) {
+  parseJavaServer: function (type: string, url: string, database: string, schema: string, __reqObj: TypeNS.ValueType, isSmart: boolean) {
     var requestMethod = StringUtil.isEmpty(type, true) || type == 'PARAM' ? 'GET' : 'POST';
 
     url = url || '';
 
-    var lastIndex = url.lastIndexOf('/');
-    var methodUri = lastIndex < 0 ? url : url.substring(lastIndex);
+    var lastIndex  = url.lastIndexOf('/');
+    var methodUri  = lastIndex < 0 ? url : url.substring(lastIndex);
     var methodName = JSONResponse.getVariableName(lastIndex < 0 ? url : url.substring(lastIndex + 1));
 
-    url = url.substring(0, lastIndex);
-    lastIndex = url.lastIndexOf('/');
-    var varName = JSONResponse.getVariableName(lastIndex < 0 ? url : url.substring(lastIndex + 1));
+    url           = url.substring(0, lastIndex);
+    lastIndex     = url.lastIndexOf('/');
+    var varName   = JSONResponse.getVariableName(lastIndex < 0 ? url : url.substring(lastIndex + 1));
     var modelName = StringUtil.firstCase(varName, true);
 
     if (StringUtil.isEmpty(modelName, true)) {
@@ -3143,46 +3450,48 @@ var CodeUtil = {
 
     var controllerUri = url; // lastIndex < 0 ? '' : url.substring(0, lastIndex);
 
-    var isPost = type != 'PARAM' && (methodUri.indexOf('post') >= 0 || methodUri.indexOf('add') >= 0 || methodUri.indexOf('create') >= 0);
-    var isPut = type != 'PARAM' && (methodUri.indexOf('put') >= 0|| methodUri.indexOf('edit') >= 0 || methodUri.indexOf('update') >= 0);
+    var reqObj = __reqObj as IndexedObj;
+
+    var isPost   = type != 'PARAM' && (methodUri.indexOf('post') >= 0 || methodUri.indexOf('add') >= 0 || methodUri.indexOf('create') >= 0);
+    var isPut    = type != 'PARAM' && (methodUri.indexOf('put') >= 0 || methodUri.indexOf('edit') >= 0 || methodUri.indexOf('update') >= 0);
     var isDelete = type != 'PARAM' && (methodUri.indexOf('delete') >= 0 || methodUri.indexOf('remove') >= 0 || methodUri.indexOf('del') >= 0);
-    var isWrite = isPost || isPut || isDelete;
-    var isGet = ! isWrite; // methodUri.indexOf('get') >= 0 || methodUri.indexOf('fetch') >= 0 || methodUri.indexOf('query') >= 0;
-    var isList = isGet && (methodUri.indexOf('list') >= 0 || methodUri.indexOf('List') >= 0 || typeof reqObj.pageNum == 'number');
+    var isWrite  = isPost || isPut || isDelete;
+    var isGet    = !isWrite; // methodUri.indexOf('get') >= 0 || methodUri.indexOf('fetch') >= 0 || methodUri.indexOf('query') >= 0;
+    var isList   = isGet && (methodUri.indexOf('list') >= 0 || methodUri.indexOf('List') >= 0 || typeof reqObj.pageNum == 'number');
 
     var dataType = isWrite ? 'Integer' : (isList ? 'List<' + modelName + '>' : modelName);
 
-    var params = isList ? (reqObj.params || {}) : null;
+    var params   = isList ? (reqObj.params || {}) : null;
     var pageSize = isList ? (reqObj.pageSize || params.pageSize) : null;
-    var pageNum = isList ? (reqObj.pageNum || params.pageNum) : null;
+    var pageNum  = isList ? (reqObj.pageNum || params.pageNum) : null;
 
     var orderBy = isList ? (reqObj.orderBy) : null;
 
     /**
      * @param annotionType RequestParam, Param, null
      */
-    function getOrderStr(orderBy) {
-     if (typeof orderBy == 'string') {
-       return orderBy;
-     }
+    function getOrderStr(orderBy: string | Array<any> | object) {
+      if (typeof orderBy == 'string') {
+        return orderBy;
+      }
 
-     if (orderBy instanceof Array == false && orderBy instanceof Object) {
-       var str = '';
-       var first = true;
-       for (var k in orderBy) {
-         var v = orderBy[k];
-         str += (first ? '' : ',') + k + ' ' + v;
-         first = false;
-       }
+      if (orderBy instanceof Array == false && orderBy instanceof Object) {
+        var str   = '';
+        var first = true;
+        for (var k in orderBy) {
+          var v = (orderBy as IndexedObj)[k];
+          str += (first ? '' : ',') + k + ' ' + v;
+          first = false;
+        }
 
-       return str;
-     }
+        return str;
+      }
 
-     return null;
+      return null;
     }
 
-    var typeArgStr = CodeUtil.getCode4JavaArgs(reqObj, true, null, ! isSmart);
-    var argStr = CodeUtil.getCode4JavaArgs(reqObj, false, null, ! isSmart);
+    var typeArgStr = CodeUtil.getCode4JavaArgs(reqObj, true, null, !isSmart);
+    var argStr     = CodeUtil.getCode4JavaArgs(reqObj, false, null, !isSmart);
 
     var code = '@RestController("' + controllerUri + '")\n' +
       'public class ' + modelName + 'Controller {\n' +
@@ -3192,7 +3501,7 @@ var CodeUtil = {
       '\n' +
       '    @' + (requestMethod == 'POST' ? 'Post' : 'Get') + 'Mapping("' + methodUri + '")  //与下面的 @RequestMapping 任选一个\n' +
       '    //@RequestMapping("' + methodUri + '", method = RequestMethod.' + requestMethod + ')\n' +
-      '    public ' + (isSmart && isList ? 'PageInfo<' + modelName + '>' : dataType) + ' ' + methodName + '(' + (type == 'JSON' ? '@RequestBody String body' : CodeUtil.getCode4JavaArgs(reqObj, true, 'RequestParam', ! isSmart)) + ') {\n';
+      '    public ' + (isSmart && isList ? 'PageInfo<' + modelName + '>' : dataType) + ' ' + methodName + '(' + (type == 'JSON' ? '@RequestBody String body' : CodeUtil.getCode4JavaArgs(reqObj, true, 'RequestParam', !isSmart)) + ') {\n';
 
     if (type == 'JSON') {
       //TODO 是否必要转成 User 类？还要考虑 PageHelper 可能是从里面取出来对象
@@ -3207,7 +3516,7 @@ var CodeUtil = {
       // else {
       //   code += nextPadding + 'JSONObject ' + k + ' = ' + name + '.getJSONObject("' + key + '");'
       // }
-      var nextPadding = CodeUtil.getBlank(2);
+      var nextPadding     = CodeUtil.getBlank(2);
       var nextNextPadding = CodeUtil.getBlank(3);
 
       code += nextPadding + 'JSONObject request = JSON.parseObject(body);' + '\n';
@@ -3225,18 +3534,17 @@ var CodeUtil = {
 
       delete reqObj.orderBy;
 
-      typeArgStr = CodeUtil.getCode4JavaArgs(reqObj, true, null, ! isSmart);
-      argStr = CodeUtil.getCode4JavaArgs(reqObj, false, null, ! isSmart);
+      typeArgStr = CodeUtil.getCode4JavaArgs(reqObj, true, null, !isSmart);
+      argStr     = CodeUtil.getCode4JavaArgs(reqObj, false, null, !isSmart);
     }
 
-    var orderStr = getOrderStr(orderBy);
+    var orderStr     = getOrderStr(orderBy);
     var isOrderEmpty = StringUtil.isEmpty(orderStr, true);
 
     if (isSmart && isList) {
       if (pageSize != null) {
         code += '\n        PageHelper.startPage(pageNum, pageSize' + (isOrderEmpty ? '' : ', orderby') + ');';
-      }
-      else if (isOrderEmpty != true) {
+      } else if (isOrderEmpty != true) {
         code += '\n        PageHelper.setOrderBy(' + orderStr + ');';
       }
     }
@@ -3264,7 +3572,7 @@ var CodeUtil = {
       '\n' +
       '@Mapper\n' +
       'public interface ' + modelName + 'Mapper {\n' +
-      '    ' + dataType + ' ' + methodName + '(' + CodeUtil.getCode4JavaArgs(reqObj, true, 'Param', ! isSmart) + ');\n' +
+      '    ' + dataType + ' ' + methodName + '(' + CodeUtil.getCode4JavaArgs(reqObj, true, 'Param', !isSmart) + ');\n' +
       '}';
 
 
@@ -3277,26 +3585,23 @@ var CodeUtil = {
     }
 
     // var columnStr = (StringUtil.isEmpty(colums, true) ? '' : StringUtil.trim(colums));
-    var quote = database == 'MYSQL' ? '`' : '"';
+    var quote     = database == 'MYSQL' ? '`' : '"';
     var tablePath = (StringUtil.isEmpty(schema, true) ? '' : quote + schema + quote + '.') + quote + modelName + quote;
     if (isPost) {
       code += '\n\n' +
         '<insert id="' + methodName + '">\n' +
         '    INSERT INTO ' + tablePath;
-    }
-    else if (isPut) {
+    } else if (isPut) {
       code += '\n\n' +
         '<update id="' + methodName + '">\n' +
         '    UPDATE ' + tablePath;
-    }
-    else if (isDelete) {
+    } else if (isDelete) {
       code += '\n\n' +
         '<delete id="' + methodName + '">\n' +
         '    DELETE FROM ' + tablePath;
-    }
-    else {
+    } else {
       var colums = Object.keys(reqObj);
-      var cs = '';
+      var cs     = '';
       if (colums != null && colums.length > 0) {
         for (var i = 0; i < colums.length; i++) {
           cs += (i <= 0 ? '' : ', ') + quote + colums[i] + quote; //需要尽可能保留原字段 [] 肯定不是字段名 JSONResponse.getVariableName(colums[i]) + quote;
@@ -3308,19 +3613,19 @@ var CodeUtil = {
         '    SELECT ' + (cs.indexOf(',') < 0 ? '*' : cs) + '\n    FROM ' + tablePath + ' AS ' + quote + modelName + quote;
     }
 
-    function getWhere(reqObj, parent, mustKeys) {
+    function getWhere(reqObj: IndexedObj, parent: null | string, mustKeys?: null | Array<string>) {
       //性能优化：强制把 id 排在最前面（增删改就不做了，很大可能就是需要按原来顺序）
-      var id = reqObj.id;
-      var userId = reqObj.userId;
+      var id      = reqObj.id;
+      var userId  = reqObj.userId;
       var user_id = reqObj.user_id;
-      var userid = reqObj.userid;
+      var userid  = reqObj.userid;
       if (id != undefined || userId != undefined || user_id != undefined || userid != undefined) {
         delete reqObj.id;
         delete reqObj.userId;
         delete reqObj.user_id;
         delete reqObj.userid;
 
-        reqObj = Object.assign({ id: id, userId: userId, user_id: user_id, userid: userid }, reqObj);
+        reqObj = Object.assign({id: id, userId: userId, user_id: user_id, userid: userid}, reqObj);
       }
 
       var str = '';
@@ -3331,23 +3636,21 @@ var CodeUtil = {
           continue;
         }
 
-        var vn = JSONResponse.getVariableName(k);
+        var vn           = JSONResponse.getVariableName(k);
         var vnWithPrefix = StringUtil.isEmpty(parent, true) ? vn : parent + '.' + vn;
-        var cn = quote + k + quote; //需要尽可能保留原字段 [] 肯定不是字段名 quote + vn + quote;
+        var cn           = quote + k + quote; //需要尽可能保留原字段 [] 肯定不是字段名 quote + vn + quote;
 
         if (v instanceof Array) {
           str += '\n' +
             '    AND ' + cn + ' IN \n' +
             '    <foreach item="item" collection="params.' + vnWithPrefix + '" separator="," open="(" close=")" index="index">\n' +
-            '        #{ item, jdbcType = ' + (typeof v[0] == 'number' ? 'NUMERIC' : 'VARCHAR' ) + ' }\n' +
+            '        #{ item, jdbcType = ' + (typeof v[0] == 'number' ? 'NUMERIC' : 'VARCHAR') + ' }\n' +
             '    </foreach>';
-        }
-        else if (v instanceof Object) {
+        } else if (v instanceof Object) {
           str += getWhere(v, vnWithPrefix);
-        }
-        else {
+        } else {
           var isMust = mustKeys != null && mustKeys.indexOf(k) >= 0;
-          var isStr = typeof v == 'string';
+          var isStr  = typeof v == 'string';
           var isLike = isMust != true && isStr && (v.length > 10 || (StringUtil.isConstName(v) != true));
 
           //没必要，前面长度+格式判断已经很精准了
@@ -3372,8 +3675,7 @@ var CodeUtil = {
 
           if (isMust) {
             str += '\n' + '    AND ' + cn + ' ' + (isLike ? 'LIKE concat(\'%\', ' : '= ') + '#{ params.' + vnWithPrefix + ' }' + (isLike ? ', \'%\')' : '');
-          }
-          else {
+          } else {
             str += '\n' +
               '    <if test="params.' + vnWithPrefix + ' != null' + (isLike ? ' and params.' + vnWithPrefix + ' != \'\'' : '') + '">\n' +
               '        AND ' + cn + ' ' + (isLike ? 'LIKE concat(\'%\', ' : '= ') + '#{ params.' + vnWithPrefix + ' }' + (isLike ? ', \'%\')' : '') + '\n' +
@@ -3413,7 +3715,7 @@ var CodeUtil = {
      * @param parent
      * @return {string}
      */
-    function getValues(reqObj) {
+    function getValues(reqObj: IndexedObj) {
       var prefix = '';
       var suffix = '\n        <trim suffixOverrides=",">';
       for (var k in reqObj) {
@@ -3426,19 +3728,19 @@ var CodeUtil = {
         var cn = quote + k + quote; //需要尽可能保留原字段 [] 肯定不是字段名 quote + vn + quote;
 
         prefix += '\n' +
-            '            <if test="params.' + vn + ' != null">\n' +
-            '                ' + cn + ', \n' +
-            '            </if>';
+          '            <if test="params.' + vn + ' != null">\n' +
+          '                ' + cn + ', \n' +
+          '            </if>';
 
         suffix += '\n' +
-            '            <if test="params.' + vn + ' != null">\n' +
-            '                ' + '#{ params.' + vn + ' }, \n' +
-            '            </if>';
+          '            <if test="params.' + vn + ' != null">\n' +
+          '                ' + '#{ params.' + vn + ' }, \n' +
+          '            </if>';
       }
       suffix += '\n        </trim>';
 
       if (StringUtil.isEmpty(prefix, true) != true) {
-         prefix = '(\n        <trim suffixOverrides=",">' + prefix + '\n        </trim>\n    ) ';
+        prefix = '(\n        <trim suffixOverrides=",">' + prefix + '\n        </trim>\n    ) ';
       }
 
       return prefix + '\n    VALUES(' + suffix + '\n    )';
@@ -3449,7 +3751,7 @@ var CodeUtil = {
      * @param parent
      * @return {string}
      */
-    function getSet(reqObj) {
+    function getSet(reqObj: IndexedObj) {
       var str = '\n\n    SET ' +
         '\n    <trim suffixOverrides=",">';
 
@@ -3463,21 +3765,21 @@ var CodeUtil = {
         var cn = quote + k + quote; //需要尽可能保留原字段 [] 肯定不是字段名 quote + vn + quote;
 
         str += '\n' +
-            '        <if test="params.' + vn + ' != null">\n' +
-            '            ' + cn + ' = #{ params.' + vn + ' }, \n' +
-            '        </if>';
+          '        <if test="params.' + vn + ' != null">\n' +
+          '            ' + cn + ' = #{ params.' + vn + ' }, \n' +
+          '        </if>';
       }
       str += '\n    </trim>';
 
       return str;
     }
 
-    function getOrder(orderBy, database) {
+    function getOrder(orderBy: string | Array<any> | object, database: string) {
       var str = '';
       str += '\n\n' +
-      '    <if test="orderBy != null and orderBy != \'\'">\n' +
-      '        ORDER BY ${ orderBy } \n' +
-      '    </if>';
+        '    <if test="orderBy != null and orderBy != \'\'">\n' +
+        '        ORDER BY ${ orderBy } \n' +
+        '    </if>';
 
       if (database != 'MYSQL' && database != 'POSTGRESQL' && database != 'SQLITE') {
         str += '\n' +
@@ -3489,7 +3791,7 @@ var CodeUtil = {
       return str;
     }
 
-    function getLimit(pageSize, pageNum, isSingle, database) {
+    function getLimit(pageSize: number, pageNum: number, isSingle: boolean, database: string) {
       if (database == 'MYSQL' || database == 'POSTGRESQL' || database == 'SQLITE') {
         if (isSingle) {
           return '\n\n' +
@@ -3521,15 +3823,13 @@ var CodeUtil = {
 
     if (isPost) {
       code += getValues(reqObj);
-    }
-    else {
+    } else {
       if (isPut) {
         var id = reqObj.id;
         delete reqObj.id;
         code += getSet(reqObj);
-        reqObj = { id: id || null };
-      }
-      else if (isDelete && reqObj.id == undefined) {
+        reqObj = {id: id || null};
+      } else if (isDelete && reqObj.id == undefined) {
         reqObj.id = null;
       }
       code += getWhere(reqObj, null, isPut || isDelete ? ['id'] : null);
@@ -3542,21 +3842,16 @@ var CodeUtil = {
 
     if (isPost) {
       code += '\n' + '</insert>';
-    }
-    else if (isPut) {
+    } else if (isPut) {
       code += '\n' + '</update>';
-    }
-    else if (isDelete) {
+    } else if (isDelete) {
       code += '\n' + '</delete>';
-    }
-    else {
+    } else {
       code += '\n' + '</select>';
     }
 
     return code;
   },
-
-
 
 
   /**解析出 生成请求JSON 的代码
@@ -3571,7 +3866,7 @@ var CodeUtil = {
    *                 其中每个都必须返回String，空的情况下返回'' -> response += callback.fun(...)
    * @return
    */
-  parseCode: function(name, reqObj, callback) {
+  parseCode: function (name: string, reqObj: TypeNS.ValueType, callback: TypeNS.ParseCodeCb): string {
     // if (reqObj == null || reqObj == '') {
     //   log(CodeUtil.TAG, 'parseCode  reqObj == null || reqObj.isEmpty() >> return null;');
     //   return null;
@@ -3587,10 +3882,10 @@ var CodeUtil = {
 
     var index = 0; //实际有效键值对key:value的所在reqObj内的位置
     var value;
-    for (var key in reqObj) {
+    for (var key in (reqObj as IndexedObj)) {
       log(CodeUtil.TAG, 'parseCode  for  key = ' + key);
       //key == null || value == null 的键值对被视为无效
-      value = key == null ? null : reqObj[key];
+      value = key == null ? null : (reqObj as IndexedObj)[key];
       // if (value == null) {
       //   continue;
       // }
@@ -3598,23 +3893,21 @@ var CodeUtil = {
 
       if (value instanceof Object == false || value instanceof Array) { //typeof value != 'object') {//APIJSON Array转为常规JSONArray
         response += callback.onParseChildOther(key, value, index);
-      }
-      else { // 其它Object，直接填充
-        log(CodeUtil.TAG, 'parseCode  for typeof value === "object" >>  ' );
+      } else { // 其它Object，直接填充
+        log(CodeUtil.TAG, 'parseCode  for typeof value === "object" >>  ');
 
         if (JSONObject.isArrayKey(key)) { // APIJSON Array转为常规JSONArray
-          log(CodeUtil.TAG, 'parseCode  for JSONObject.isArrayKey(key) >>  ' );
+          log(CodeUtil.TAG, 'parseCode  for JSONObject.isArrayKey(key) >>  ');
 
           response += callback.onParseChildArray(key, value, index);
-        }
-        else { // 常规JSONObject，往下一级提取
-          log(CodeUtil.TAG, 'parseCode  for JSONObject.isArrayKey(key) == false >>  ' );
+        } else { // 常规JSONObject，往下一级提取
+          log(CodeUtil.TAG, 'parseCode  for JSONObject.isArrayKey(key) == false >>  ');
 
           response += callback.onParseChildObject(key, value, index);
         }
       }
 
-      index ++;
+      index++;
     }
 
     response += callback.onParseParentEnd();
@@ -3624,23 +3917,16 @@ var CodeUtil = {
   },
 
 
-
-
-
-
-
-
-
   /**用数据字典转为JavaBean
    * @param docObj
    */
-  parseJavaBean: function(docObj, clazz, database) {
+  parseJavaBean: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
     var item;
 
-    var blank = CodeUtil.getBlank(1);
+    var blank  = CodeUtil.getBlank(1);
     var blank2 = CodeUtil.getBlank(2);
 
     //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -3689,7 +3975,7 @@ var CodeUtil = {
             + '\n' + blank2 + 'this();'
             + '\n' + blank2 + 'setId(id);'
             + '\n' + blank + '}'
-            + '\n\n'
+            + '\n\n';
 
           var name;
           var type;
@@ -3703,17 +3989,17 @@ var CodeUtil = {
             }
 
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getJavaType(column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getJavaType(column.column_type, false);
 
 
             console.log('parseJavaBean [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
             doc += '\n' + blank + 'private ' + type + ' ' + name + '; ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
 
-          doc += '\n\n'
+          doc += '\n\n';
 
           for (var j = 0; j < columnList.length; j++) {
             column = (columnList[j] || {}).Column;
@@ -3723,7 +4009,7 @@ var CodeUtil = {
               continue;
             }
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getJavaType(column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getJavaType(column.column_type, false);
 
             console.log('parseJavaBean [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
@@ -3753,13 +4039,13 @@ var CodeUtil = {
   /**用数据字典转为JavaBean
    * @param docObj
    */
-  parseCppStruct: function(docObj, clazz, database) {
+  parseCppStruct: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
     var item;
 
-    var blank = CodeUtil.getBlank(1);
+    var blank  = CodeUtil.getBlank(1);
     var blank2 = CodeUtil.getBlank(2);
 
     //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -3803,9 +4089,9 @@ var CodeUtil = {
 
           console.log('parseCppStruct [] for ' + i + ': columnList = \n' + format(JSON.stringify(columnList)));
 
-          var constructor = '\n\n' + blank + model + '()';
+          var constructor         = '\n\n' + blank + model + '()';
           var constructorWithArgs = '\n\n' + blank + model + '(';
-          var fields = '\n\n';
+          var fields              = '\n\n';
 
           var name;
           var type;
@@ -3820,7 +4106,7 @@ var CodeUtil = {
             }
 
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'long' : CodeUtil.getCppType(column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'long' : CodeUtil.getCppType(column.column_type, false);
 
             console.log('parseCppStruct [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
@@ -3840,11 +4126,11 @@ var CodeUtil = {
             }
 
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'long' : CodeUtil.getCppType(column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'long' : CodeUtil.getCppType(column.column_type, false);
 
             console.log('parseCppStruct [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
             fields += '\n' + blank + type + ' ' + name + '; ' + CodeUtil.getComment((o || {}).column_comment, false);
 
             constructor += (first2 ? ' : ' : ', ') + name + '()';
@@ -3871,13 +4157,13 @@ var CodeUtil = {
   /**用数据字典转为JavaBean
    * @param docObj
    */
-  parseObjectiveCEntity: function(docObj, clazz, database) {
+  parseObjectiveCEntity: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
     var item;
 
-    var blank = CodeUtil.getBlank(1);
+    var blank  = CodeUtil.getBlank(1);
     var blank2 = CodeUtil.getBlank(2);
 
     //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -3926,7 +4212,7 @@ var CodeUtil = {
             + '\n' + blank2 + 'this();'
             + '\n' + blank2 + 'setId(id);'
             + '\n' + blank + '}'
-            + '\n\n'
+            + '\n\n';
 
           var name;
           var type;
@@ -3940,17 +4226,17 @@ var CodeUtil = {
             }
 
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getJavaType(column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getJavaType(column.column_type, false);
 
 
             console.log('parseJavaBean [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
             doc += '\n' + blank + 'private ' + type + ' ' + name + '; ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
 
-          doc += '\n\n'
+          doc += '\n\n';
 
           for (var j = 0; j < columnList.length; j++) {
             column = (columnList[j] || {}).Column;
@@ -3960,7 +4246,7 @@ var CodeUtil = {
               continue;
             }
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getJavaType(column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getJavaType(column.column_type, false);
 
             console.log('parseJavaBean [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
@@ -3991,13 +4277,13 @@ var CodeUtil = {
   /**用数据字典转为 PHP 实体类
    * @param docObj
    */
-  parsePHPEntity: function(docObj, clazz, database) {
+  parsePHPEntity: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
     var item;
 
-    var blank = CodeUtil.getBlank(1);
+    var blank  = CodeUtil.getBlank(1);
     var blank2 = CodeUtil.getBlank(2);
 
     //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -4048,7 +4334,7 @@ var CodeUtil = {
             // + '\n' + blank2 + '$this->construct();'
             // + '\n' + blank2 + '$this->setId($id);'
             // + '\n' + blank + '}'
-            + '\n\n'
+            + '\n\n';
 
           var name;
 
@@ -4065,12 +4351,12 @@ var CodeUtil = {
 
             console.log('parsePHPEntity [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
             doc += '\n' + blank + 'private $' + name + '; ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
 
-          doc += '\n\n'
+          doc += '\n\n';
 
           for (var j = 0; j < columnList.length; j++) {
             column = (columnList[j] || {}).Column;
@@ -4111,13 +4397,13 @@ var CodeUtil = {
   /**用数据字典转为JavaBean
    * @param docObj
    */
-  parseGoEntity: function(docObj, clazz, database) {
+  parseGoEntity: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
     var item;
 
-    var blank = CodeUtil.getBlank(1);
+    var blank  = CodeUtil.getBlank(1);
     var blank2 = CodeUtil.getBlank(2);
 
     //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -4169,12 +4455,12 @@ var CodeUtil = {
             }
 
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'int64' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_GO, column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'int64' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_GO, column.column_type, false);
 
 
             console.log('parseGoEntity [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
             doc += '\n' + blank + name + ' ' + type + '  `json:"' + name + '"`  ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
@@ -4194,13 +4480,13 @@ var CodeUtil = {
   /**用数据字典转为JavaBean
    * @param docObj
    */
-  parseCSharpEntity: function(docObj, clazz, database) {
+  parseCSharpEntity: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
     var item;
 
-    var blank = CodeUtil.getBlank(1);
+    var blank  = CodeUtil.getBlank(1);
     var blank2 = CodeUtil.getBlank(2);
 
     //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -4250,7 +4536,7 @@ var CodeUtil = {
             + '\n' + blank2 + '{'
             + '\n' + blank2 + blank + 'setId(id);'
             + '\n' + blank2 + '}'
-            + '\n\n'
+            + '\n\n';
 
           var name;
           var type;
@@ -4264,12 +4550,12 @@ var CodeUtil = {
             }
 
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'Int64' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_C_SHARP, column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'Int64' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_C_SHARP, column.column_type, false);
 
 
             console.log('parseCSharpBean [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
             doc += '\n' + blank2 + 'private ' + type + ' ' + name + ' { get; set; } ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
@@ -4290,7 +4576,7 @@ var CodeUtil = {
   /**用数据字典转为 TypeScript 类
    * @param docObj
    */
-  parseTypeScriptEntity: function(docObj, clazz, database) {
+  parseTypeScriptEntity: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
@@ -4344,12 +4630,12 @@ var CodeUtil = {
               continue;
             }
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'number' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_TYPE_SCRIPT, column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'number' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_TYPE_SCRIPT, column.column_type, false);
 
             console.log('parseTypeScriptClass [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
-            doc += '\n        public '+ name + ': ' + type + ', ' + CodeUtil.getComment((o || {}).column_comment, false);
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
+            doc += '\n        public ' + name + ': ' + type + ', ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
 
@@ -4367,16 +4653,15 @@ var CodeUtil = {
   },
 
 
-
   /**用数据字典转为 Python 类
    * @param docObj
    */
-  parsePythonEntity: function(docObj, clazz, database) {
+  parsePythonEntity: function (docObj: null | IndexedObj, clazz: string, database: string) {
     //转为Java代码格式
     var doc = '';
     var item;
 
-    var blank = CodeUtil.getBlank(1);
+    var blank  = CodeUtil.getBlank(1);
     var blank2 = CodeUtil.getBlank(2);
 
     //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -4434,17 +4719,17 @@ var CodeUtil = {
             }
 
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.getType4Language(CodeUtil.LANGUAGE_PYTHON, column.column_type, false);
+            type               = CodeUtil.getType4Language(CodeUtil.LANGUAGE_PYTHON, column.column_type, false);
 
 
             console.log('parseCSharpEntity [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
             doc += '\n' + blank + name + ': ' + type + ' = None ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
 
-          doc += '\n\n'
+          doc += '\n\n';
 
           for (var j = 0; j < columnList.length; j++) {
             column = (columnList[j] || {}).Column;
@@ -4454,7 +4739,7 @@ var CodeUtil = {
               continue;
             }
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.getType4Language(CodeUtil.LANGUAGE_PYTHON, column.column_type, false);
+            type               = CodeUtil.getType4Language(CodeUtil.LANGUAGE_PYTHON, column.column_type, false);
 
             console.log('parsePythonEntity [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
@@ -4480,17 +4765,16 @@ var CodeUtil = {
   },
 
 
-
   /**用数据字典转为 Swift Entity 类
    * @param docObj
    */
-  parseSwiftStruct: function(docObj, clazz, database) {
+  parseSwiftStruct: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
     var item;
 
-    var blank = CodeUtil.getBlank(1);
+    var blank  = CodeUtil.getBlank(1);
     var blank2 = CodeUtil.getBlank(2);
 
     //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -4541,12 +4825,12 @@ var CodeUtil = {
               continue;
             }
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'Int' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_SWIFT, column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'Int' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_SWIFT, column.column_type, false);
 
             console.log('parseSwiftStruct [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
-            doc += '\n' + blank + 'var '+ name + ': ' + type + '? ' + CodeUtil.getComment((o || {}).column_comment, false);
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
+            doc += '\n' + blank + 'var ' + name + ': ' + type + '? ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
 
@@ -4564,7 +4848,7 @@ var CodeUtil = {
   /**用数据字典转为 TypeScript 类
    * @param docObj
    */
-  parseJavaScriptEntity: function(docObj, clazz, database) {
+  parseJavaScriptEntity: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
@@ -4634,8 +4918,8 @@ var CodeUtil = {
 
             console.log('parseJavaScriptClass [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
-            doc += '\n        this.'+ name + ' = ' + name + ' ' + CodeUtil.getComment((o || {}).column_comment, false);
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
+            doc += '\n        this.' + name + ' = ' + name + ' ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
 
@@ -4655,13 +4939,13 @@ var CodeUtil = {
   /**用数据字典转为 Kotlin Data 类
    * @param docObj
    */
-  parseKotlinDataClass: function(docObj, clazz, database) {
+  parseKotlinDataClass: function (docObj: null | IndexedObj, clazz: string, database: string) {
 
     //转为Java代码格式
     var doc = '';
     var item;
 
-    var blank = CodeUtil.getBlank(1);
+    var blank  = CodeUtil.getBlank(1);
     var blank2 = CodeUtil.getBlank(2);
 
     //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
@@ -4712,12 +4996,12 @@ var CodeUtil = {
               continue;
             }
             column.column_type = CodeUtil.getColumnType(column, database);
-            type = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_KOTLIN, column.column_type, false);
+            type               = CodeUtil.isId(name, column.column_type) ? 'Long' : CodeUtil.getType4Language(CodeUtil.LANGUAGE_KOTLIN, column.column_type, false);
 
             console.log('parseKotlinDataClass [] for j=' + j + ': column = \n' + format(JSON.stringify(column)));
 
-            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute
-            doc += '\n' + blank + 'var '+ name + ': ' + type + '? = null ' + CodeUtil.getComment((o || {}).column_comment, false);
+            var o = database != 'POSTGRESQL' ? column : (columnList[j] || {}).PgAttribute;
+            doc += '\n' + blank + 'var ' + name + ': ' + type + '? = null ' + CodeUtil.getComment((o || {}).column_comment, false);
 
           }
 
@@ -4733,12 +5017,11 @@ var CodeUtil = {
   },
 
 
-
   /**获取model类名
    * @param tableName
    * @return {*}
    */
-  getModelName: function(tableName) {
+  getModelName : function (tableName: string) {
     var model = StringUtil.noBlank(tableName);
     if (model == '') {
       return model;
@@ -4753,7 +5036,7 @@ var CodeUtil = {
    * @param columnName
    * @return {*}
    */
-  getFieldName: function(columnName) {
+  getFieldName : function (columnName: string) {
     return StringUtil.firstCase(StringUtil.noBlank(columnName), false);
   },
   /**获取model方法名
@@ -4761,7 +5044,7 @@ var CodeUtil = {
    * @param field @NotNull
    * @return {*}
    */
-  getMethodName: function(prefix, field) {
+  getMethodName: function (prefix: string, field: string) {
     if (field.startsWith('_')) {
       field = '_' + field; //get_name 会被fastjson解析为name而不是_name，所以要多加一个_
     }
@@ -4774,7 +5057,7 @@ var CodeUtil = {
    * @param prefix 多行注释的前缀，一般是空格
    * @return {*}
    */
-  getComment: function(comment, multiple, prefix) {
+  getComment: function (comment: null | string, multiple: boolean, prefix?: null | string) {
     comment = comment == null ? '' : comment.trim();
     if (prefix == null) {
       prefix = '';
@@ -4798,7 +5081,7 @@ var CodeUtil = {
       newComment += prefix + ' * ' + comment.substring(0, index);
       comment = comment.substring(index + 2);
     }
-    while(comment != '')
+    while (comment != '');
 
     return newComment + '\n' + prefix + ' */';
   },
@@ -4807,7 +5090,7 @@ var CodeUtil = {
    * @param value
    * @return {*}
    */
-  getCode4Value: function (language, value, key, depth, isSmart, isArrayItem, callback) {
+  getCode4Value: function (language: string, value: null | boolean | number | string | object, key?: string, depth?: null | number, isSmart?: boolean, isArrayItem?: boolean, callback?: Function) {
     language = language || '';
     if (value == null) {
       switch (language) {
@@ -4896,9 +5179,9 @@ var CodeUtil = {
       return value;
     }
     if (typeof value == 'string') {
-      log(CodeUtil.TAG, 'getCode4Value  typeof value === "string"  >>  return " + value + ";' );
+      log(CodeUtil.TAG, 'getCode4Value  typeof value === "string"  >>  return " + value + ";');
       if (isSmart && [CodeUtil.LANGUAGE_JAVA_SCRIPT, CodeUtil.LANGUAGE_TYPE_SCRIPT, CodeUtil.LANGUAGE_PHP, CodeUtil.LANGUAGE_PYTHON].indexOf(language) >= 0) {
-        return "'" + value + "'";
+        return '\'' + value + '\'';
       }
       return '"' + value + '"';
     }
@@ -4907,16 +5190,16 @@ var CodeUtil = {
       return value;
     }
 
-    depth = (depth || 0)
+    depth = (depth || 0);
     return '\n' + CodeUtil.getBlank(depth + 1) + callback(key, value, depth + 1, isSmart, isArrayItem);// + '\n' + CodeUtil.getBlank(depth);
   },
 
-  getJavaTypeFromJS: function (key, value, isArrayItem, baseFirst, rawType, isSmart) {
+  getJavaTypeFromJS: function (key: string, value: TypeNS.ValueType, isArrayItem: boolean, baseFirst?: boolean, rawType?: boolean, isSmart?: boolean) {
     if (typeof value == 'boolean') {
       return baseFirst ? 'boolean' : 'Boolean';
     }
     if (typeof value == 'number') {
-      if (String(value).indexOf(".") >= 0) {
+      if (String(value).indexOf('.') >= 0) {
         return baseFirst ? 'double' : 'Double';
       }
       if (Math.abs(value) >= 2147483647 || CodeUtil.isId(key, 'bigint', isArrayItem)) {
@@ -4928,21 +5211,21 @@ var CodeUtil = {
       return 'String';
     }
     if (value instanceof Array) {
-      return rawType ? 'List<Object>' : (! isSmart ? 'JSONArray' : 'List<' + StringUtil.firstCase(JSONResponse.getTableName(key), true) + '>');
+      return rawType ? 'List<Object>' : (!isSmart ? 'JSONArray' : 'List<' + StringUtil.firstCase(JSONResponse.getTableName(key), true) + '>');
     }
     if (value instanceof Object) {
-      return rawType ? 'Map<String, Object>' : (! isSmart ? 'JSONObject' : StringUtil.firstCase(JSONResponse.getTableName(key), true));
+      return rawType ? 'Map<String, Object>' : (!isSmart ? 'JSONObject' : StringUtil.firstCase(JSONResponse.getTableName(key), true));
     }
 
     return 'Object';
   },
 
-  getKotlinTypeFromJS: function (key, value, isArrayItem, baseFirst, rawType, isSmart) {
+  getKotlinTypeFromJS: function (key: string, value: any, isArrayItem: boolean, baseFirst: boolean, rawType?: boolean, isSmart?: boolean) {
     if (typeof value == 'boolean') {
       return baseFirst ? 'boolean' : 'Boolean';
     }
     if (typeof value == 'number') {
-      if (String(value).indexOf(".") >= 0) {
+      if (String(value).indexOf('.') >= 0) {
         return baseFirst ? 'double' : 'Double';
       }
       if (Math.abs(value) >= 2147483647 || CodeUtil.isId(key, 'bigint', isArrayItem)) {
@@ -4954,21 +5237,21 @@ var CodeUtil = {
       return 'String';
     }
     if (value instanceof Array) {
-      return rawType ? 'List<Any?>' : (! isSmart ? 'JSONArray' : 'List<' + StringUtil.firstCase(JSONResponse.getTableName(key), true) + '>');
+      return rawType ? 'List<Any?>' : (!isSmart ? 'JSONArray' : 'List<' + StringUtil.firstCase(JSONResponse.getTableName(key), true) + '>');
     }
     if (value instanceof Object) {
-      return rawType ? 'Map<String, Any?>' : (! isSmart ? 'JSONObject' : StringUtil.firstCase(JSONResponse.getTableName(key), true));
+      return rawType ? 'Map<String, Any?>' : (!isSmart ? 'JSONObject' : StringUtil.firstCase(JSONResponse.getTableName(key), true));
     }
 
     return 'Any';
   },
 
-  getCSharpTypeFromJS: function (key, value, baseFirst) {
+  getCSharpTypeFromJS: function (key: string, value: any, baseFirst?: boolean) {
     if (typeof value == 'boolean') {
       return baseFirst ? 'bool' : 'Boolean';
     }
     if (typeof value == 'number') {
-      if (String(value).indexOf(".") >= 0) {
+      if (String(value).indexOf('.') >= 0) {
         return baseFirst ? 'double' : 'Double';
       }
       if (Math.abs(value) >= 2147483647 || CodeUtil.isId(key, 'bigint')) {
@@ -4989,12 +5272,12 @@ var CodeUtil = {
     return baseFirst ? 'object' : 'Object';
   },
 
-  getSwiftTypeFromJS: function (key, value) {
+  getSwiftTypeFromJS: function (key: string, value: any) {
     if (typeof value == 'boolean') {
       return 'Bool';
     }
     if (typeof value == 'number') {
-      if (String(value).indexOf(".") >= 0) {
+      if (String(value).indexOf('.') >= 0) {
         return 'Double';
       }
       return 'Int';
@@ -5013,16 +5296,16 @@ var CodeUtil = {
   },
 
 
-  getCppTypeFromJS: function (key, value, isArrayItem) {
+  getCppTypeFromJS: function (key: string, value: any, isArrayItem?: boolean) {
     if (typeof value == 'boolean') {
       return 'bool';
     }
     if (typeof value == 'number') {
-      if (String(value).indexOf(".") >= 0) {
+      if (String(value).indexOf('.') >= 0) {
         return 'double';
       }
       if (Math.abs(value) >= 2147483647 || CodeUtil.isId(key, 'bigint', isArrayItem)) {
-        return 'long'
+        return 'long';
       }
       return 'int';
     }
@@ -5039,12 +5322,12 @@ var CodeUtil = {
     return 'rapidjson::Value&';
   },
 
-  getCppGetterFromJS: function (key, value, isArrayItem) {
+  getCppGetterFromJS: function (key: string, value: any, isArrayItem?: boolean) {
     if (typeof value == 'boolean') {
       return 'GetBool';
     }
     if (typeof value == 'number') {
-      if (String(value).indexOf(".") >= 0) {
+      if (String(value).indexOf('.') >= 0) {
         return 'GetDouble';
       }
       return Math.abs(value) >= 2147483647 || CodeUtil.isId(key, 'bigint', isArrayItem) ? 'GetInt64' : 'GetInt';
@@ -5062,12 +5345,12 @@ var CodeUtil = {
     return 'Get';
   },
 
-  getPythonTypeFromJS: function (key, value) {
+  getPythonTypeFromJS: function (key: string, value: any) {
     if (typeof value == 'boolean') {
       return 'bool';
     }
     if (typeof value == 'number') {
-      if (String(value).indexOf(".") >= 0) {
+      if (String(value).indexOf('.') >= 0) {
         return 'double';
       }
       return 'int';
@@ -5085,12 +5368,12 @@ var CodeUtil = {
     return 'any';
   },
 
-  getGoTypeFromJS: function (key, value) {
+  getGoTypeFromJS: function (key: string, value: any) {
     if (typeof value == 'boolean') {
       return 'bool';
     }
     if (typeof value == 'number') {
-      if (String(value).indexOf(".") >= 0) {
+      if (String(value).indexOf('.') >= 0) {
         return 'double';
       }
       return 'int';
@@ -5108,7 +5391,7 @@ var CodeUtil = {
     return 'map[string]interface{}';
   },
 
-  getColumnType: function (column, database) {
+  getColumnType: function (column: null | IndexedObj, database: string) {
     if (column == null) {
       return 'text';
     }
@@ -5124,14 +5407,12 @@ var CodeUtil = {
         log(CodeUtil.TAG, 'getColumnType  column.character_maximum_length != null >>  column.character_maximum_length = ' + column.character_maximum_length);
 
         len = '(' + column.character_maximum_length + ')';
-      }
-      else if (column.numeric_precision != null) { // dt.indexOf('int') >= 0) {
+      } else if (column.numeric_precision != null) { // dt.indexOf('int') >= 0) {
         log(CodeUtil.TAG, 'getColumnType  column.numeric_precision != null >>  column.numeric_precision = ' + column.numeric_precision + '; column.numeric_scale = ' + column.numeric_scale);
 
         len = '(' + column.numeric_precision + (column.numeric_scale == null || column.numeric_scale <= 0 ? '' : ',' + column.numeric_scale) + ')';
-      }
-      else {
-        len = ''
+      } else {
+        len = '';
       }
 
       log(CodeUtil.TAG, 'getColumnType  return dt + len; = ' + (dt + len));
@@ -5146,17 +5427,17 @@ var CodeUtil = {
    * @param t
    * @param saveLength
    */
-  getJavaType: function(type, saveLength) {
+  getJavaType     : function (type: string, saveLength: boolean) {
     return CodeUtil.getType4Language(CodeUtil.LANGUAGE_JAVA, type, saveLength);
   },
   /**根据数据库类型获取Java类型
    * @param t
    * @param saveLength
    */
-  getCppType: function(type, saveLength) {
+  getCppType      : function (type: string, saveLength: boolean) {
     return CodeUtil.getType4Language(CodeUtil.LANGUAGE_C_PLUS_PLUS, type, saveLength);
   },
-  getType4Language: function(language, type, saveLength) {
+  getType4Language: function (language: string, type: string, saveLength?: boolean) {
     log(CodeUtil.TAG, 'getJavaType  type = ' + type + '; saveLength = ' + saveLength);
     type = StringUtil.noBlank(type);
 
@@ -5205,7 +5486,7 @@ var CodeUtil = {
 
   },
 
-  getType4Any: function (language, length) {
+  getType4Any    : function (language: string, length: string) {
     length = length || '';
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
@@ -5235,7 +5516,7 @@ var CodeUtil = {
     }
     return 'Object' + length;  //以 JSON 类型为准
   },
-  getType4Boolean: function (language, length) {
+  getType4Boolean: function (language: string, length: string) {
     length = length || '';
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
@@ -5262,7 +5543,7 @@ var CodeUtil = {
     }
     return 'Boolean' + length;  //以 JSON 类型为准
   },
-  getType4Integer: function (language, length) {
+  getType4Integer: function (language: string, length: string) {
     length = length || '';
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
@@ -5292,8 +5573,8 @@ var CodeUtil = {
     }
     return 'Integer' + length;  //以 JSON 类型为准
   },
-  getType4Long: function (language, length) {
-    length = length || ''
+  getType4Long   : function (language: string, length: string) {
+    length = length || '';
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
         return 'Int' + length;
@@ -5322,8 +5603,8 @@ var CodeUtil = {
     return CodeUtil.getType4Integer(language, length);
   },
 
-  getType4Decimal: function (language, length) {
-    length = length || ''
+  getType4Decimal  : function (language: string, length: string) {
+    length = length || '';
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
       case CodeUtil.LANGUAGE_JAVA:
@@ -5351,8 +5632,8 @@ var CodeUtil = {
     }
     return 'Number' + length;  //以 JSON 类型为准
   },
-  getType4String: function (language, length) {
-    length = length || ''
+  getType4String   : function (language: string, length: string) {
+    length = length || '';
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
       case CodeUtil.LANGUAGE_JAVA:
@@ -5379,8 +5660,8 @@ var CodeUtil = {
     }
     return 'String' + length;  //以 JSON 类型为准
   },
-  getType4Date: function (language, length) {
-    length = length || ''
+  getType4Date     : function (language: string, length: string) {
+    length = length || '';
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
       case CodeUtil.LANGUAGE_JAVA:
@@ -5409,8 +5690,8 @@ var CodeUtil = {
     }
     return CodeUtil.getType4String(language, length);
   },
-  getType4Timestamp: function (language, length) {
-    length = length || ''
+  getType4Timestamp: function (language: string, length: string) {
+    length = length || '';
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
       case CodeUtil.LANGUAGE_JAVA:
@@ -5439,7 +5720,7 @@ var CodeUtil = {
     }
     return CodeUtil.getType4Integer(language, length);
   },
-  getType4Object: function (language) {
+  getType4Object   : function (language: string) {
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
       case CodeUtil.LANGUAGE_JAVA:
@@ -5468,11 +5749,11 @@ var CodeUtil = {
     }
     return 'Object';  //以 JSON 类型为准
   },
-  getType4ByteArray: function (language) {
+  getType4ByteArray: function (language: string, unknown_param: unknown) {
     return 'byte[]';
   },
-  getType4Array: function (language) {
-    length = length || ''
+  getType4Array    : function (language: string, length?: string) {
+    length = length || '';
     switch (language) {
       case CodeUtil.LANGUAGE_KOTLIN:
       case CodeUtil.LANGUAGE_JAVA:
@@ -5507,8 +5788,11 @@ var CodeUtil = {
    * @param columnType
    * @return {string}
    */
-  getMaxLength: function (columnType) {
+  getMaxLength: function (columnType: null | string) {
     var index = columnType == null ? -1 : columnType.indexOf('(');
+    if (columnType == null) {
+      throw new Error('columnType为null！');
+    }
     return index < 0 ? '不限' : columnType.substring(index + 1, columnType.length - (columnType.endsWith(')') ? 1 : 0));
   },
 
@@ -5517,9 +5801,9 @@ var CodeUtil = {
    * @param depth
    * @return {string}
    */
-  getBlank: function(depth) {
+  getBlank: function (depth: number) {
     var s = '';
-    for (var i = 0; i < depth; i ++) {
+    for (var i = 0; i < depth; i++) {
       s += '    ';
     }
     return s;
@@ -5530,7 +5814,7 @@ var CodeUtil = {
    * @param arr
    * @param path
    */
-  getArrayString: function(arr, path) {
+  getArrayString: function (arr: Array<any>, path: unknown) {
     if (arr == null || arr.length <= 0) {
       return arr;
     }
@@ -5538,12 +5822,13 @@ var CodeUtil = {
     var s = '';
     var v;
     var t;
-    for (var i = 0; i < arr.length; i ++) {
+    for (var i = 0; i < arr.length; i++) {
       t = typeof arr[i];
-      if (t == 'object' || t == 'array') {
-        //TODO 不止为什么parseJavaResponse会调用这个函数，先放过  throw new Error('请求JSON中 ' + (path || '""') + ':[] 格式错误！key:[] 的[]中所有元素都不能为对象{}或数组[] ！');
+      if (t == 'object' || (t as any) == 'array') {
+        // FIXME 不止为什么parseJavaResponse会调用这个函数，先放过  throw new Error('请求JSON中 ' + (path || '""') + ':[] 格式错误！key:[] 的[]中所有元素都不能为对象{}或数组[] ！');
+        throw new Error('此处，typeof 中并没有array的值！');
       }
-      v = (t == 'string' ? '"' + arr[i] + '"': arr[i]) //只支持基本类型
+      v = (t == 'string' ? '"' + arr[i] + '"' : arr[i]); //只支持基本类型
       s += (i > 0 ? ', ' : '') + v;
     }
     return s;
@@ -5554,7 +5839,7 @@ var CodeUtil = {
    * @param key
    * @return empty ? 'request' : key
    */
-  getTableKey: function(key) {
+  getTableKey: function (key: string) {
     key = StringUtil.trim(key);
     return key == '' ? 'request' : StringUtil.firstCase(key, false);//StringUtil.addSuffix(key, 'Request');
   },
@@ -5562,7 +5847,7 @@ var CodeUtil = {
    * @param key
    * @return empty ? 'item' : key + 'Item' 且首字母小写
    */
-  getItemKey: function(key) {
+  getItemKey : function (key: string) {
     return StringUtil.addSuffix(key.substring(0, key.length - 2), 'Item');
   },
 
@@ -5570,7 +5855,7 @@ var CodeUtil = {
    * @param column
    * @return {boolean}
    */
-  isId: function (column, type, isArrayItem) {
+  isId: function (column: null | string, type: null | string, isArrayItem?: boolean) {
     if (column == null || type == null || type.indexOf('int') < 0) {
       return false;
     }
@@ -5610,9 +5895,15 @@ var CodeUtil = {
       // }
 
       while (true) {
-        var index = column == null || column.length < 2 ? -1 : column.lastIndexOf('d');
+        var index: number = (column == null || column.length < 2)
+          ? -1
+          : column.lastIndexOf('d');
         if (index <= 0) {
           break;
+        }
+
+        if (column == null) {
+          throw new Error('column为null！');
         }
 
         var prefix = column.substring(index <= 2 ? 0 : index - 2, index);
@@ -5620,7 +5911,7 @@ var CodeUtil = {
         if (prefix.endsWith('I') || (prefix.endsWith('i') && /[A-Za-z]/.test(prefix.length < 2 ? '' : prefix.substring(0, 1)) == false)) {
 
           var suffix = column.length <= index + 1 ? '' : column.substring(index + 1, index + 3);
-          var after = suffix.length < 1 ? '' : suffix.substring(0, 1);
+          var after  = suffix.length < 1 ? '' : suffix.substring(0, 1);
 
           // id%, %_id, %Id%, %ids%, %_ids%, %Ids%
           if (/[a-z]/.test(after) == false || (after == 's' && /[a-z]/.test(suffix.length < 2 ? '' : suffix.substring(1, 2)) == false)) {
@@ -5639,29 +5930,28 @@ var CodeUtil = {
     }
 
     var index = column.lastIndexOf('_'); // snake_case
-    var id = index < 0 ? column : column.substring(index + 1);
+    var id    = index < 0 ? column : column.substring(index + 1);
     return id.toLowerCase() == 'id';
   },
 
 
-
-  QUERY_TYPES: ['数据', '数量', '全部'],
-  JOIN_TYPES: {"@": 'APP', "<": 'LEFT', ">": 'RIGHT', "*": 'CROSS', "&": 'INNER', "|": 'FULL', "!": 'OUTER', "^": 'SIDE', "(": 'ANTI', ")": 'FOREIGN'},
-  CACHE_TYPES: ['全部', '磁盘', '内存'],
-  SUBQUERY_RANGES: ['ANY', 'ALL'],
-  QUERY_TYPE_KEYS: [0, 1, 2],
-  CACHE_TYPE_KEYS: [0, 1, 2],
-  QUERY_TYPE_CONSTS: ["JSONRequest.QUERY_TABLE", "JSONRequest.QUERY_TOTAL", "JSONRequest.QUERY_ALL"],
-  ROLE_KEYS: ['UNKNOWN', 'LOGIN', 'CONTACT', 'CIRCLE', 'OWNER', 'ADMIN'],
-  ROLES: {
+  QUERY_TYPES      : ['数据', '数量', '全部'],
+  JOIN_TYPES       : {'@': 'APP', '<': 'LEFT', '>': 'RIGHT', '*': 'CROSS', '&': 'INNER', '|': 'FULL', '!': 'OUTER', '^': 'SIDE', '(': 'ANTI', ')': 'FOREIGN'},
+  CACHE_TYPES      : ['全部', '磁盘', '内存'],
+  SUBQUERY_RANGES  : ['ANY', 'ALL'],
+  QUERY_TYPE_KEYS  : [0, 1, 2],
+  CACHE_TYPE_KEYS  : [0, 1, 2],
+  QUERY_TYPE_CONSTS: ['JSONRequest.QUERY_TABLE', 'JSONRequest.QUERY_TOTAL', 'JSONRequest.QUERY_ALL'],
+  ROLE_KEYS        : ['UNKNOWN', 'LOGIN', 'CONTACT', 'CIRCLE', 'OWNER', 'ADMIN'],
+  ROLES            : {
     UNKNOWN: '未登录',
-    LOGIN: '已登录',
+    LOGIN  : '已登录',
     CONTACT: '联系人',
-    CIRCLE: '圈子成员',
-    OWNER: '拥有者',
-    ADMIN: '管理员'
+    CIRCLE : '圈子成员',
+    OWNER  : '拥有者',
+    ADMIN  : '管理员'
   },
-  DATABASE_KEYS: ['MYSQL', 'POSTGRESQL', 'SQLSERVER', 'ORACLE', 'DB2', 'SQLITE'],
+  DATABASE_KEYS    : ['MYSQL', 'POSTGRESQL', 'SQLSERVER', 'ORACLE', 'DB2', 'SQLITE'],
 
   /**获取请求JSON的注释
    * @param tableList
@@ -5671,7 +5961,9 @@ var CodeUtil = {
    * @param isInSubquery
    * @param database
    */
-  getComment4Request: function (tableList, name, key, value, method, isInSubquery, database, language, isReq, names, isRestful) {
+  getComment4Request: function (tableList: Array<any> | null, name: string, key: string, value: TypeNS.ValueType, method: string,
+                                isInSubquery: boolean, database: string, language: string, isReq: boolean, names: null | Array<any>, isRestful: boolean,
+  ) {
     // alert('name = ' + name + '; key = ' + key + '; value = ' + value + '; method = ' + method);
 
     if (key == null) {
@@ -5685,7 +5977,7 @@ var CodeUtil = {
 
       var pathKeys = []; // slice 居然每次都返回数字 1  names == null || names.length < 2 ? null : names.slice(2).push(key)
       if (names != null && names.length > 2) {
-        for (var i = 2; i < names.length; i ++) {
+        for (var i = 2; i < names.length; i++) {
           pathKeys.push(names[i]);
         }
       }
@@ -5694,8 +5986,7 @@ var CodeUtil = {
       try {
         var c = CodeUtil.getCommentFromDoc(tableList, name, key, method, database, language, false, isReq, pathKeys, isRestful, value == null ? {} : value);
         return StringUtil.isEmpty(c) ? ' ! 字段 ' + key + ' 不存在！' : CodeUtil.getComment(c, false, '  ');
-      }
-      catch (e) {
+      } catch (e) {
         return e.message;
       }
     }
@@ -5706,7 +5997,7 @@ var CodeUtil = {
     if (value instanceof Array) {
       if ((method == 'POST' || method == 'PUT') && JSONObject.isArrayKey(key)) {
         var aliaIndex = key.indexOf(':');
-        var objName = key.substring(0, aliaIndex >= 0 ? aliaIndex : key.length - 2);
+        var objName   = key.substring(0, aliaIndex >= 0 ? aliaIndex : key.length - 2);
 
         if (JSONObject.isTableKey(objName)) {
           var c = CodeUtil.getCommentFromDoc(tableList, objName, null, method, database, language);
@@ -5716,23 +6007,22 @@ var CodeUtil = {
       }
 
       return '';
-    }
-    else if (value == null || value instanceof Object) {
+    } else if (value == null || value instanceof Object) {
 
-      if (isRestful != true && key.endsWith('@')) {
+      if ((isRestful as boolean) != true && key.endsWith('@')) {
         if (key == '@from@') {
           return CodeUtil.getComment('数据来源：匿名子查询，例如 {"from":"Table", "Table":{}}', false, '  ');
         }
 
         var aliaIndex = name == null ? -1 : name.indexOf(':');
-        var objName = aliaIndex < 0 ? name : name.substring(0, aliaIndex);
+        var objName   = aliaIndex < 0 ? name : name.substring(0, aliaIndex);
         if (JSONObject.isTableKey(objName)) {
           return CodeUtil.getComment('子查询 < ' + CodeUtil.getCommentFromDoc(tableList, objName, key.substring(0, key.length - 1), method, database, language), false, '  ');
         }
-        return CodeUtil.getComment('子查询 ' + StringUtil.get(name) + "，需要被下面的表字段相关 key 引用赋值", false, '  ');
+        return CodeUtil.getComment('子查询 ' + StringUtil.get(name) + '，需要被下面的表字段相关 key 引用赋值', false, '  ');
       }
 
-      if (isRestful != true && JSONObject.isArrayKey(key)) {
+      if ((isRestful as boolean) != true && JSONObject.isArrayKey(key)) {
         if (method != 'GET') {
           return ' ! key[]:{}只支持GET方法！';
         }
@@ -5740,19 +6030,19 @@ var CodeUtil = {
         key = key.substring(0, key.lastIndexOf('[]'));
 
         var aliaIndex = key.indexOf(':');
-        var objName = aliaIndex < 0 ? key : key.substring(0, aliaIndex);
-        var alias = aliaIndex < 0 ? '' : key.substring(aliaIndex + 1, key.length);
+        var objName   = aliaIndex < 0 ? key : key.substring(0, aliaIndex);
+        var alias     = aliaIndex < 0 ? '' : key.substring(aliaIndex + 1, key.length);
 
         var firstIndex = objName.indexOf('-');
-        var firstKey = firstIndex < 0 ? objName : objName.substring(0, firstIndex);
-        alias = alias.length <= 0 ? '' : '新建别名: ' + alias + ' < ';
+        var firstKey   = firstIndex < 0 ? objName : objName.substring(0, firstIndex);
+        alias          = alias.length <= 0 ? '' : '新建别名: ' + alias + ' < ';
         return CodeUtil.getComment((JSONObject.isTableKey(firstKey) ? '提取' + objName + ' < ' : '') + alias + '数组', false, '  ');
       }
 
       var aliaIndex = key.indexOf(':');
-      var objName = aliaIndex < 0 ? key : key.substring(0, aliaIndex);
+      var objName   = aliaIndex < 0 ? key : key.substring(0, aliaIndex);
 
-      if (isRestful == true || JSONObject.isTableKey(objName)) {
+      if ((isRestful as boolean) == true || JSONObject.isTableKey(objName)) {
         var c = CodeUtil.getCommentFromDoc(tableList, objName, null, method, database, language);
         return StringUtil.isEmpty(c) ? ' ! 表不存在！' : CodeUtil.getComment(
           (aliaIndex < 0 ? '' : '新建别名: ' + key.substring(aliaIndex + 1, key.length) + ' < ' + objName + ': ') + c, false, '  ');
@@ -5761,7 +6051,7 @@ var CodeUtil = {
       return '';
     }
 
-    if (isRestful != true && (isInSubquery || JSONObject.isArrayKey(name))) {
+    if ((isRestful as boolean) != true && (isInSubquery || JSONObject.isArrayKey(name))) {
       switch (key) {
         case 'count':
           return CodeUtil.getType4Request(value) != 'number' ? ' ! value必须是Number类型！' : CodeUtil.getComment('最多数量: 例如 5 10 20 ...', false, '  ');
@@ -5769,16 +6059,16 @@ var CodeUtil = {
           if (CodeUtil.getType4Request(value) != 'number') {
             return ' ! value必须是Number类型！';
           }
-          return value < 0 ? ' ! 必须 >= 0 ！' : CodeUtil.getComment('分页页码: 例如 0 1 2 ...', false, '  ');
+          return ((value as any)) < 0 ? ' ! 必须 >= 0 ！' : CodeUtil.getComment('分页页码: 例如 0 1 2 ...', false, '  ');
         case 'query':
-          var query = CodeUtil.QUERY_TYPES[value];
+          var query = CodeUtil.QUERY_TYPES[(value as any)];
           return StringUtil.isEmpty(query) ? ' ! value必须是[' + CodeUtil.QUERY_TYPE_KEYS.join() + ']中的一种！' : CodeUtil.getComment('查询内容：0-数据 1-总数 2-全部', false, '  ');
         case 'join':
           if (CodeUtil.getType4Request(value) != 'string') {
             return ' ! value必须是String类型！';
           }
 
-          var s = '';
+          var s     = '';
           var items = value.length < 3 ? null : StringUtil.split(value.substring(1, value.length - 1));
           if (items != null && items.length > 0) {
 
@@ -5791,14 +6081,14 @@ var CodeUtil = {
                 return ' ! ' + item + ' 不合法 ! 必须以 @ 结尾，例如 &/User/id@ ！';
               }
 
-              var index = item.indexOf('/');
+              var index     = item.indexOf('/');
               var lastIndex = item.lastIndexOf('/');
 
               if (index < 0 || lastIndex <= index + 1) {
                 return ' ! ' + item + ' 不合法 ! 必须有两个不相邻的 /，例如 &/User/id@ ！';
               }
 
-              var c = index <= 0 ? '|' : item.substring(0, index);
+              var c: string = index <= 0 ? '|' : item.substring(0, index);
               if (chars.indexOf(c) < 0) {
                 return ' ! JOIN 类型 ' + c + ' 不合法 ! 必须是 [' + chars.join(', ') + '] 中的一种！';
               }
@@ -5808,7 +6098,7 @@ var CodeUtil = {
                 return ' ! 表名 ' + t + ' 不合法 ! 必须是 Table 这种大驼峰格式，例如 User ！';
               }
 
-              s += CodeUtil.JOIN_TYPES[c] + ' JOIN ' + t + ' ';
+              s += (CodeUtil.JOIN_TYPES as IndexedObj)[c] + ' JOIN ' + t + ' ';
             }
           }
 
@@ -5832,9 +6122,9 @@ var CodeUtil = {
     }
 
     var aliaIndex = name.indexOf(':');
-    var objName = aliaIndex < 0 ? name : name.substring(0, aliaIndex);
+    var objName   = aliaIndex < 0 ? name : name.substring(0, aliaIndex);
 
-    if (isRestful != true && JSONObject.isTableKey(objName)) {
+    if ((isRestful as boolean) != true && JSONObject.isTableKey(objName)) {
       switch (key) {
         case '@column':
           return CodeUtil.getType4Request(value) != 'string' ? ' ! value必须是String类型！' : CodeUtil.getComment('返回字段：例如 id,name;json_length(contactIdList):contactCount;...', false, '  ');
@@ -5853,16 +6143,18 @@ var CodeUtil = {
         case '@database':
           try {
             value = value.substring(1, value.length - 1);
-          } catch (e) {}
+          } catch (e) {
+          }
           return CodeUtil.DATABASE_KEYS.indexOf(value) < 0 ? ' ! value必须是[' + CodeUtil.DATABASE_KEYS.join() + ']中的一种！' : CodeUtil.getComment('数据库：例如 MYSQL POSTGRESQL SQLSERVER ORACLE ...', false, '  ');
         case '@role':
           try {
             value = value.substring(1, value.length - 1);
-          } catch (e) {}
-          var role = CodeUtil.ROLES[value];
+          } catch (e) {
+          }
+          var role = (CodeUtil.ROLES as IndexedObj)[value];
           return StringUtil.isEmpty(role) ? ' ! value必须是[' + CodeUtil.ROLE_KEYS.join() + ']中的一种！' : CodeUtil.getComment('来访角色：' + role, false, '  ');
         case '@cache':
-          var cache = CodeUtil.CACHE_TYPES[value];
+          var cache = (CodeUtil.CACHE_TYPES as IndexedObj)[value];
           return StringUtil.isEmpty(cache) ? ' ! value必须是[' + CodeUtil.CACHE_TYPE_KEYS.join() + ']中的一种！' : CodeUtil.getComment('缓存方式：0-全部 1-磁盘 2-内存', false, '  ');
         case '@explain':
           return CodeUtil.getType4Request(value) != 'boolean' ? ' ! value必须是Boolean类型！' : CodeUtil.getComment('性能分析：true-开启 false-关闭', false, '  ');
@@ -5875,7 +6167,7 @@ var CodeUtil = {
     }
 
     // alert('name = ' + name + '; key = ' + key);
-    if (isRestful != true && StringUtil.isEmpty(name)) {
+    if ((isRestful as boolean) != true && StringUtil.isEmpty(name)) {
       switch (key) {
         case 'tag':
           // if (method == 'GET' || method == 'HEAD') {
@@ -5894,16 +6186,18 @@ var CodeUtil = {
         case '@database':
           try {
             value = value.substring(1, value.length - 1);
-          } catch (e) {}
+          } catch (e) {
+          }
           return CodeUtil.DATABASE_KEYS.indexOf(value) < 0 ? ' ! value必须是[' + CodeUtil.DATABASE_KEYS.join() + ']中的一种！' : CodeUtil.getComment('数据库：例如 MYSQL POSTGRESQL SQLSERVER ORACLE ...', false, '  ');
         case '@role':
           try {
             value = value.substring(1, value.length - 1);
-          } catch (e) {}
-          var role = CodeUtil.ROLES[value];
+          } catch (e) {
+          }
+          var role = (CodeUtil.ROLES as IndexedObj)[value];
           return StringUtil.isEmpty(role) ? ' ! value必须是[' + CodeUtil.ROLE_KEYS.join() + ']中的一种！' : CodeUtil.getComment('默认角色：' + role, false, '  ');
         case '@cache':
-          var cache = CodeUtil.CACHE_TYPES[value];
+          var cache = (CodeUtil.CACHE_TYPES as IndexedObj)[value];
           return StringUtil.isEmpty(cache) ? ' ! value必须是[' + CodeUtil.CACHE_TYPE_KEYS.join() + ']中的一种！' : CodeUtil.getComment('缓存方式：0-全部 1-磁盘 2-内存', false, '  ');
         case '@explain':
           return CodeUtil.getType4Request(value) != 'boolean' ? ' ! value必须是Boolean类型！' : CodeUtil.getComment('性能分析：true-开启 false-关闭', false, '  ');
@@ -5923,18 +6217,21 @@ var CodeUtil = {
    * @param onlyTableAndColumn
    * @return {*}
    */
-  getCommentFromDoc: function (tableList, tableName, columnName, method, database, language, onlyTableAndColumn, isReq, pathKeys, isRestful, value) {
+  getCommentFromDoc: function (
+    tableList: null | Array<any>, tableName: string, columnName: null | string, method: string, database: string, language: string,
+    onlyTableAndColumn?: boolean, isReq?: boolean, pathKeys?: null | Array<string>, isRestful?: boolean, value?: any
+  ): string {
     log('getCommentFromDoc  tableName = ' + tableName + '; columnName = ' + columnName
       + '; method = ' + method + '; database = ' + database + '; language = ' + language
       + '; onlyTableAndColumn = ' + onlyTableAndColumn + '; tableList = \n' + JSON.stringify(tableList));
 
     if (isRestful == true && StringUtil.isEmpty(columnName, true) == false && StringUtil.isEmpty(CodeUtil.thirdParty, true) == false) { // } && CodeUtil.thirdParty == 'YAPI') {
       var apiMap = CodeUtil.thirdPartyApiMap;
-      var api = apiMap == null ? null : apiMap[(method.startsWith('/') ? '' : '/') + method];
-      var doc = api == null ? null : (isReq ? api.request : api.response);
+      var api    = apiMap == null ? null : apiMap[(method.startsWith('/') ? '' : '/') + method];
+      var doc    = api == null ? null : (isReq ? api.request : api.response);
       if (doc != null) {
         if (pathKeys != null && pathKeys.length > 0) {
-          for (var i = 0; i < pathKeys.length; i ++) {
+          for (var i = 0; i < pathKeys.length; i++) {
             var p = pathKeys[i];
 
             if (doc instanceof Array) {
@@ -5942,7 +6239,7 @@ var CodeUtil = {
               for (var j = 0; j < doc.length; j++) {
                 var d = doc[j];
                 if (d != null && d.name == p) {
-                  doc = d;
+                  doc  = d;
                   find = true;
                   break;
                 }
@@ -5951,28 +6248,24 @@ var CodeUtil = {
               if (find == false) {
                 doc = null;
               }
-            }
-            else if (doc instanceof Object) {
+            } else if (doc instanceof Object) {
               if (doc.type == 'object') {
                 doc = doc.properties;
-              }
-              else if (doc.type == 'array') {
+              } else if (doc.type == 'array') {
                 doc = doc.items;
               }
 
               doc = doc[p];
             }
           }
-        }
-        else if (doc instanceof Array) {
+        } else if (doc instanceof Array) {
           doc = null;
         }
 
         var c = doc == null ? null : StringUtil.trim(doc.description || doc.title);
         if (doc != null && StringUtil.isEmpty(doc.type, true) == false && doc.type != (isReq ? CodeUtil.getType4Request(value) : typeof value)) {
           throw new Error(' ! value必须是' + CodeUtil.getType4Language(language, doc.type) + '类型！' + CodeUtil.getComment(c, false, '  '));
-        }
-        else {
+        } else {
           if (StringUtil.isEmpty(c, true) == false) {
             return CodeUtil.getType4Language(language, doc.type, true) + ', ' + c;
           }
@@ -6006,117 +6299,105 @@ var CodeUtil = {
             : (database == 'SQLSERVER'
               ? (item.ExtendedProperty || {}).table_comment
               : table.table_comment
-          )
+            )
         );
       }
 
-      var at = '';
-      var fun = '';
+      var at    = '';
+      var fun   = '';
       var key;
       var logic = '';
 
       if (onlyTableAndColumn) {
         key = new String(columnName);
-      }
-      else {
+      } else {
 
         //功能符 <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-        if (columnName.endsWith("()")) {//方法，查询完后处理，先用一个Map<key,function>保存？
+        if (columnName == null) {
+          throw new Error('columnName为null！');
+        }
+
+        if (columnName.endsWith('()')) {//方法，查询完后处理，先用一个Map<key,function>保存？
           return '远程函数';
         }
 
 
-        if (columnName.endsWith("@")) {//引用，引用对象查询完后处理。fillTarget中暂时不用处理，因为非GET请求都是由给定的id确定，不需要引用
+        if (columnName.endsWith('@')) {//引用，引用对象查询完后处理。fillTarget中暂时不用处理，因为非GET请求都是由给定的id确定，不需要引用
           // 没传 value 进来，不好解析，而且太长导致后面的字段属性被遮住
           // var lastIndex = value.lastIndexOf('/');
           // var refLastPath =
           // at = '引用赋值: ' + tableName + '.' + columnName + '=' + ;
 
-          at = '引用赋值';
+          at         = '引用赋值';
           columnName = columnName.substring(0, columnName.length - 1);
         }
 
-        if (columnName.endsWith("$")) {//搜索，查询时处理
+        if (columnName.endsWith('$')) {//搜索，查询时处理
           fun = '模糊搜索';
           key = columnName.substring(0, columnName.length - 1);
-        }
-        else if (columnName.endsWith("~")) {//匹配正则表达式，查询时处理
+        } else if (columnName.endsWith('~')) {//匹配正则表达式，查询时处理
           fun = '正则匹配';
           key = columnName.substring(0, columnName.length - 1);
-          if (key.endsWith("*")) {
+          if (key.endsWith('*')) {
             key = key.substring(0, key.length - 1);
             fun += '(忽略大小写)';
           }
-        }
-        else if (columnName.endsWith("%")) {//连续范围 BETWEEN AND，查询时处理
+        } else if (columnName.endsWith('%')) {//连续范围 BETWEEN AND，查询时处理
           fun = '连续范围';
           key = columnName.substring(0, columnName.length - 1);
-        }
-        else if (columnName.endsWith("{}")) {//被包含，或者说key对应值处于value的范围内。查询时处理
+        } else if (columnName.endsWith('{}')) {//被包含，或者说key对应值处于value的范围内。查询时处理
           fun = '匹配 选项/条件';
           key = columnName.substring(0, columnName.length - 2);
-        }
-        else if (columnName.endsWith("<>")) {//包含，或者说value处于key对应值的范围内。查询时处理
+        } else if (columnName.endsWith('<>')) {//包含，或者说value处于key对应值的范围内。查询时处理
           fun = '包含选项';
           key = columnName.substring(0, columnName.length - 2);
-        }
-        else if (columnName.endsWith("}{")) {//存在，EXISTS。查询时处理
+        } else if (columnName.endsWith('}{')) {//存在，EXISTS。查询时处理
           fun = '是否存在';
           key = columnName.substring(0, columnName.length - 2);
-        }
-        else if (columnName.endsWith("+")) {//延长，PUT查询时处理
+        } else if (columnName.endsWith('+')) {//延长，PUT查询时处理
           if (method != 'PUT') {//不为PUT就抛异常
             return ' ! 功能符 + - 只能用于PUT请求！';
           }
           fun = '增加/扩展';
           key = columnName.substring(0, columnName.length - 1);
-        }
-        else if (columnName.endsWith("-")) {//缩减，PUT查询时处理
+        } else if (columnName.endsWith('-')) {//缩减，PUT查询时处理
           if (method != 'PUT') {//不为PUT就抛异常
             return ' ! 功能符 + - 只能用于PUT请求！';
           }
           fun = '减少/去除';
           key = columnName.substring(0, columnName.length - 1);
-        }
-        else if (columnName.endsWith(">=")) {//大于或等于
+        } else if (columnName.endsWith('>=')) {//大于或等于
           fun = '大于或等于';
           key = columnName.substring(0, columnName.length - 2);
-        }
-        else if (columnName.endsWith("<=")) {//小于或等于
+        } else if (columnName.endsWith('<=')) {//小于或等于
           fun = '小于或等于';
           key = columnName.substring(0, columnName.length - 2);
-        }
-        else if (columnName.endsWith(">")) {//大于
+        } else if (columnName.endsWith('>')) {//大于
           fun = '大于';
           key = columnName.substring(0, columnName.length - 1);
-        }
-        else if (columnName.endsWith("<")) {//小于
+        } else if (columnName.endsWith('<')) {//小于
           fun = '小于';
           key = columnName.substring(0, columnName.length - 1);
-        }
-        else {
+        } else {
           fun = '';
-          key = new String(columnName);
+          key = String(columnName);
         }
 
 
-        if (key.endsWith("&")) {
+        if (key.endsWith('&')) {
           if (fun.length <= 0) {
             return ' ! 逻辑运算符 & | 后面必须接其它功能符！';
           }
           logic = '符合全部';
-        }
-        else if (key.endsWith("|")) {
+        } else if (key.endsWith('|')) {
           if (fun.length <= 0) {
             return ' ! 逻辑运算符 & | 后面必须接其它功能符！';
           }
           logic = '符合任意';
-        }
-        else if (key.endsWith("!")) {
+        } else if (key.endsWith('!')) {
           logic = '都不符合';
-        }
-        else {
+        } else {
           logic = '';
         }
 
@@ -6145,7 +6426,7 @@ var CodeUtil = {
       var name;
       for (var j = 0; j < columnList.length; j++) {
         column = (columnList[j] || {}).Column;
-        name = column == null ? null : column.column_name;
+        name   = column == null ? null : column.column_name;
         if (name == null || key != name) {
           continue;
         }
@@ -6171,13 +6452,13 @@ var CodeUtil = {
     return '';
   },
 
-  getType4Request: function (value) {
+  getType4Request: function (value: any) {
     var t = typeof value;
     return t != 'string' ? t : typeof JSON.parse(value);
   }
 
-}
+};
 
 export {
   CodeUtil
-}
+};

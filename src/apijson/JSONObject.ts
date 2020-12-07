@@ -13,6 +13,8 @@
  limitations under the License.*/
 
 
+import {log} from './api-util';
+
 /**common keys and functions for APIJSON object
  * @author Lemon
  */
@@ -20,10 +22,9 @@ var JSONObject = {
   TAG: 'JSONObject',
 
   /**判断key是否为表名
-   * @param key
    * @return
    */
-  isTableKey: function(key, value, isRestful) {
+  isTableKey: function (key?: null | string, value?: object, isRestful?: boolean) {
     log(this.TAG, 'isTableKey  typeof key = ' + (typeof key));
     if (key == null) {
       return false;
@@ -37,13 +38,11 @@ var JSONObject = {
       return true;
     }
 
-    return  /^[A-Z][A-Za-z0-9_]*$/.test(key);
+    return /^[A-Z][A-Za-z0-9_]*$/.test(key);
   },
   /**判断key是否为数组名
-   * @param key
-   * @return
    */
-  isArrayKey: function(key, value, isRestful) {
+  isArrayKey: function (key?: null | string, value?: Array<any> | object, isRestful?: boolean) {
     log(this.TAG, 'isArrayKey  typeof key = ' + (typeof key));
 
     if (key == null) {
@@ -51,6 +50,7 @@ var JSONObject = {
     }
 
     if (isRestful == true) {
+      // @ts-ignore
       return value == null || typeof value == 'array';
     }
 
@@ -61,10 +61,10 @@ var JSONObject = {
     return key.endsWith('[]');
   }
 
-}
+};
 
 //TODO 取消注释  Object.freeze(JSONObject) //不可修改
 
 export {
   JSONObject,
-}
+};
