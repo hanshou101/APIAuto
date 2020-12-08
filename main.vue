@@ -556,26 +556,65 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
 </template>
 
 <script lang="ts">
-import {log}          from 'src/apijson/api-util';
-import {format}       from 'src/apijson/JSONRequest';
-import Vue            from 'vue';
-import {StringUtil}   from './src/apijson/StringUtil';
-import {CodeUtil}     from './src/apijson/CodeUtil';
-import {JSONResponse} from './src/apijson/JSONResponse';
+import {log}                from 'src/apijson/api-util';
+import {format, toFormData} from 'src/apijson/JSONRequest';
+import Vue                  from 'vue';
+import {StringUtil}         from './src/apijson/StringUtil';
+import {CodeUtil}           from './src/apijson/CodeUtil';
+import {JSONResponse}       from './src/apijson/JSONResponse';
+import {globalVars}         from './src/global';
 
 const saveTextAs: (content: string, filename: string) => void = (window as any).saveTextAs;
 const vInput: HTMLInputElement                                = (window as any).vInput;
 const vHeader: HTMLInputElement                               = (window as any).vHeader;
 const vRandom: HTMLInputElement                               = (window as any).vRandom;
+const vRemember: HTMLInputElement                             = (window as any).vRemember;
+const vUrl: HTMLInputElement                                  = (window as any).vUrl;
+const vUrlComment: HTMLInputElement                           = (window as any).vUrlComment;
+const vOutput: HTMLInputElement                               = (window as any).vOutput;
+const vVerify: HTMLInputElement                               = (window as any).vVerify;
+const vComment: HTMLInputElement                              = (window as any).vComment;
+const vSend: HTMLInputElement                                 = (window as any).vSend;
 //
-const localforage: { iterate: Function, }                     = (window as any).localforage;
+const onScrollChanged: Function                               = (window as any).onScrollChanged;
+const onURLScrollChanged: Function                            = (window as any).onURLScrollChanged;
+const markdownToHTML: Function                                = (window as any).markdownToHTML;
+
+//
+const localforage: {
+  iterate(
+      fn: (value: HistoryNS.Val | number, key: string, iterationNumber: number) => void
+  ): void,
+  removeItem(key: string, cb: () => void): void;
+  setItem(key: string, value: any, cb?: (err: null | Error, value: any) => void): void;
+} = (window as any).localforage;
+const jsonlint: {
+  parse(str: string): IndexedObj;
+} = (window as any).jsonlint;
+const difflib: {
+  stringAsLines(str: string): string;
+  SequenceMatcher: {
+    new(base: string, newtxt: string): {
+      get_opcodes(): string;
+    };
+  };
+} = (window as any).difflib;
+const diffview: {
+  buildView: Function;
+} = (window as any).diffview;
+const axios: {
+  (options: any): Promise<IndexedObj /*| {}*/ | null>;
+} = (window as any).axios;
+const Helper: {
+  alert(msg: string, type: string): void;
+} = (window as any).Helper;
 
 
 var initJson = {};
 var baseUrl: string;
 var inputted: string;
 var handler: number;
-var doc: string;
+var doc: NullableType<string>;
 var output: string;
 var doneCount: number;
 
@@ -730,18 +769,18 @@ export default Vue.extend({
       jsonhtml           : initJson,
       compressStr        : '',
       error              : {},
-      requestVersion     : 3,
+      requestVersion     : 3 as (string | number),
       requestCount       : 1,
       urlComment         : '关联查询 Comment.userId = User.id',
-      historys           : [],
+      historys           : [] as Array<HistoryNS.Val>,
       history            : {name: '请求0'},
-      remotes            : [],
-      locals             : [],
-      testCases          : [],
-      randoms            : [],
-      randomSubs         : [],
-      account            : '13000082001',
-      password           : '123456',
+      remotes            : [] as NullableType<Array<any>>,
+      locals             : [] as Array<LocalNS.Item>,
+      testCases          : [] as Array<LocalNS.Item>,
+      randoms            : [] as NullableType<Array<any>>,
+      randomSubs         : [] as NullableType<Array<any>>,
+      account            : '13000082001' as UndefinedAbleType<string>,
+      password           : '123456' as UndefinedAbleType<string>,
       accounts           : [
         {
           'isLoggedIn': false,
@@ -761,32 +800,32 @@ export default Vue.extend({
           'phone'     : '13000082003',
           'password'  : '123456'
         }
-      ],
+      ] as Array<AccountNS.Item>,
       currentAccountIndex: 0,
-      tests              : {'-1': {}, '0': {}, '1': {}, '2': {}},
+      tests              : {'-1': {}, '0': {}, '1': {}, '2': {}} as IndexedObj,
       crossProcess       : '交叉账号:已关闭',
       testProcess        : '机器学习:已关闭',
-      randomTestTitle    : '随机测试 Random Test',
+      randomTestTitle    : '随机测试 Random Test' as NullableType<string>,
       testRandomCount    : 1,
       testRandomProcess  : '',
       compareColor       : '#0000',
       isDelayShow        : false,
       isSaveShow         : false,
       isExportShow       : false,
-      isExportRandom     : false,
+      isExportRandom     : false as UndefinedAbleType<boolean>,
       isTestCaseShow     : false,
       isHeaderShow       : false,
       isRandomShow       : true,  // 默认展示
       isRandomListShow   : false,
-      isRandomSubListShow: false,
+      isRandomSubListShow: false as UndefinedAbleType<boolean>,
       isRandomEditable   : false,
       isLoginShow        : false,
       isConfigShow       : false,
       isDeleteShow       : false,
       currentDocItem     : {},
-      currentRemoteItem  : {},
-      currentRandomItem  : {},
-      isAdminOperation   : false,
+      currentRemoteItem  : {} as IndexedObj,
+      currentRandomItem  : {} as IndexedObj,
+      isAdminOperation   : false as UndefinedAbleType<boolean>,
       loginType          : 'login',
       isExportRemote     : false,
       isRegister         : false,
@@ -800,7 +839,7 @@ export default Vue.extend({
       exTxt              : {
         name  : 'APIJSON测试',
         button: '保存',
-        index : 0
+        index : 0 as UndefinedAbleType<number>,
       },
       themes             : themes,
       checkedTheme       : 0,
@@ -809,13 +848,13 @@ export default Vue.extend({
         id  : 0,
         name: '',
         head: ''
-      },
+      } as ({ id?: number, name?: string, head?: string, phone?: string, password?: string, remember?: boolean }),
       Privacy            : {
         id     : 0,
         balance: null //点击更新提示需要判空 0.00
-      },
+      } as IndexedObj,
       type               : REQUEST_TYPE_JSON,
-      types              : [REQUEST_TYPE_PARAM, REQUEST_TYPE_JSON, REQUEST_TYPE_FORM, REQUEST_TYPE_DATA, REQUEST_TYPE_GRPC],  //默认展示
+      types              : [REQUEST_TYPE_PARAM, REQUEST_TYPE_JSON, REQUEST_TYPE_FORM, REQUEST_TYPE_DATA, REQUEST_TYPE_GRPC] as NullableType<Array<string>>,  //默认展示
       host               : '',
       database           : 'MYSQL',// 'POSTGRESQL',
       schema             : 'sys',
@@ -839,16 +878,18 @@ export default Vue.extend({
       randomSubCount     : 50,
       randomSubSearch    : '',
 
-    //
-
-      isSyncing:false,
+      //
+      StringUtil,
+      isSyncing     : false,
+      vRemember,
+      isDeleteRandom: false as UndefinedAbleType<boolean>,
     };
   },
   computed  : {
     theme: function () {
-      var th     = this.themes[this.checkedTheme];
-      var result = {};
-      var index  = 0;
+      var th                 = this.themes[this.checkedTheme];
+      var result: IndexedObj = {};
+      var index              = 0;
       ['key', 'String', 'Number', 'Boolean', 'Null', 'link-link'].forEach(function (key) {
         result[key] = th[index];
         index++;
@@ -865,7 +906,7 @@ export default Vue.extend({
     try { //可能URL_BASE是const类型，不允许改，这里是初始化，不能出错
       var url = this.getCache('', 'URL_BASE');
       if (StringUtil.isEmpty(url, true) == false) {
-        URL_BASE = url;
+        globalVars.URL_BASE = url;
       }
       var database = this.getCache('', 'database');
       if (StringUtil.isEmpty(database, true) == false) {
@@ -903,10 +944,10 @@ export default Vue.extend({
           '\n} catch (e) {\n' + e.message);
     }
     try { //这里是初始化，不能出错
-      var accounts = this.getCache(URL_BASE, 'accounts');
+      var accounts = this.getCache(globalVars.URL_BASE, 'accounts');
       if (accounts != null) {
         this.accounts            = accounts;
-        this.currentAccountIndex = this.getCache(URL_BASE, 'currentAccountIndex');
+        this.currentAccountIndex = this.getCache(globalVars.URL_BASE, 'currentAccountIndex');
       }
     } catch (e) {
       console.log('created  try { ' +
@@ -1007,8 +1048,8 @@ export default Vue.extend({
         return;
       }
 
-      var base    = difflib.stringAsLines(JSON.stringify(oldJSON, '', 4));
-      var newtxt  = difflib.stringAsLines(JSON.stringify(newJSON, '', 4));
+      var base    = difflib.stringAsLines(JSON.stringify(oldJSON, (k, v) => '', 4));
+      var newtxt  = difflib.stringAsLines(JSON.stringify(newJSON, (k, v) => '', 4));
       var sm      = new difflib.SequenceMatcher(base, newtxt);
       var opcodes = sm.get_opcodes();
       $('#diffoutput').empty().append(diffview.buildView({
@@ -1045,7 +1086,7 @@ export default Vue.extend({
         } else {
           this.view = 'code';
 
-          if (isSingle) {
+          if (globalVars.isSingle) {
             this.jsonhtml = jsonlint.parse(this.jsoncon);
           } else {
             this.jsonhtml = Object.assign({
@@ -1066,7 +1107,7 @@ export default Vue.extend({
     },
 
 
-    showUrl: function (isAdminOperation, branchUrl) {
+    showUrl: function (isAdminOperation: boolean | undefined, branchUrl: string) {
       if (StringUtil.isEmpty(this.host, true)) {  //显示(可编辑)URL Host
         if (isAdminOperation != true) {
           baseUrl = this.getBaseUrl();
@@ -1079,7 +1120,7 @@ export default Vue.extend({
         vUrl.value = branchUrl;
       }
 
-      vUrlComment.value = isSingle || StringUtil.isEmpty(this.urlComment, true)
+      vUrlComment.value = globalVars.isSingle || StringUtil.isEmpty(this.urlComment, true)
           ? '' : vUrl.value + CodeUtil.getComment(this.urlComment, false, '  ')
           + ' - ' + (this.requestVersion > 0 ? 'V' + this.requestVersion : 'V*');
     },
@@ -1114,10 +1155,10 @@ export default Vue.extend({
       var url    = new String(vUrl.value).trim();
       var length = this.getBaseUrlLength(url);
       url        = length <= 0 ? '' : url.substring(0, length);
-      return url == '' ? URL_BASE : url;
+      return url == '' ? globalVars.URL_BASE : url;
     },
     //获取基地址长度，以://后的第一个/分割baseUrl和method
-    getBaseUrlLength: function (url_) {
+    getBaseUrlLength: function (url_: string) {
       var url   = StringUtil.trim(url_);
       var index = url.indexOf(' ');
       if (index >= 0) {
@@ -1136,7 +1177,7 @@ export default Vue.extend({
     },
     //获取请求的tag
     getTag          : function () {
-      var req = null;
+      var req: (IndexedObj | undefined | null) = null;
       try {
         req = this.getRequest(vInput.value);
       } catch (e) {
@@ -1145,7 +1186,7 @@ export default Vue.extend({
       return req == null ? null : req.tag;
     },
 
-    getRequest: function (json, defaultValue) {
+    getRequest: function (json: string, defaultValue?: IndexedObj) {
       var s = this.toDoubleJSON(json, defaultValue);
       if (StringUtil.isEmpty(s, true)) {
         return defaultValue;
@@ -1158,9 +1199,9 @@ export default Vue.extend({
         return jsonlint.parse(this.removeComment(s));
       }
     },
-    getHeader : function (text) {
-      var header = {};
-      var hs     = StringUtil.isEmpty(text, true) ? null : StringUtil.split(text, '\n');
+    getHeader : function (text: string) {
+      var header: IndexedObj = {};
+      var hs                 = StringUtil.isEmpty(text, true) ? null : StringUtil.split(text, '\n');
 
       if (hs != null && hs.length > 0) {
         var item;
@@ -1199,7 +1240,7 @@ export default Vue.extend({
     },
 
     // 显示保存弹窗
-    showSave: function (show) {
+    showSave: function (show: boolean) {
       if (show) {
         if (this.isTestCaseShow) {
           alert('请先输入请求内容！');
@@ -1213,7 +1254,7 @@ export default Vue.extend({
     },
 
     // 显示导出弹窗
-    showExport: function (show, isRemote, isRandom) {
+    showExport: function (show: boolean, isRemote: boolean, isRandom?: boolean) {
       if (show) {
         if (isRemote) { //共享测试用例
           this.isExportRandom = isRandom;
@@ -1293,7 +1334,7 @@ export default Vue.extend({
     },
 
     // 显示配置弹窗
-    showConfig: function (show, index) {
+    showConfig: function (show: boolean, index?: number) {
       this.isConfigShow = false;
       if (this.isTestCaseShow) {
         if (index == 3 || index == 4 || index == 5 || index == 10) {
@@ -1383,7 +1424,7 @@ export default Vue.extend({
         }
       } else if (index == 3) {
         var host   = StringUtil.get(this.host);
-        var branch = new String(vUrl.value);
+        var branch = String(vUrl.value);
         this.host  = '';
         vUrl.value = host + branch; //保证 showUrl 里拿到的 baseUrl = this.host (http://apijson.cn:8080/put /balance)
         this.setBaseUrl(); //保证自动化测试等拿到的 baseUrl 是最新的
@@ -1401,7 +1442,7 @@ export default Vue.extend({
     },
 
     // 显示删除弹窗
-    showDelete: function (show, item, index, isRandom) {
+    showDelete: function (show: boolean, item: IndexedObj, index?: number, isRandom?: boolean) {
       this.isDeleteShow   = show;
       this.isDeleteRandom = isRandom;
       this.exTxt.name     = '请输入' + (isRandom ? '随机配置' : '接口') + '名来确认';
@@ -1418,9 +1459,9 @@ export default Vue.extend({
 
     // 删除接口文档
     deleteDoc: function () {
-      var isDeleteRandom = this.isDeleteRandom;
-      var item           = (isDeleteRandom ? this.currentRandomItem : this.currentDocItem) || {};
-      var doc            = (isDeleteRandom ? item.Random : item.Document) || {};
+      var isDeleteRandom   = this.isDeleteRandom;
+      var item: IndexedObj = (isDeleteRandom ? this.currentRandomItem : this.currentDocItem) || {};
+      var doc              = (isDeleteRandom ? item.Random : item.Document) || {};
 
       var type = isDeleteRandom ? '随机配置' : '接口';
       if (doc.id == null) {
@@ -1452,21 +1493,31 @@ export default Vue.extend({
         'tag'     : 'Document'
       };
       this.request(true, REQUEST_TYPE_JSON, url, req, {}, (url, res, err) => {
-        this.onResponse(url, res, err);
+        this.onResponse(url, res, err as Error);
 
         var rpObj = res.data || {};
 
         if (isDeleteRandom) {
-          if (rpObj.Random != null && rpObj.Random.code == CODE_SUCCESS) {
+          if (rpObj.Random != null && rpObj.Random.code == globalVars.CODE_SUCCESS) {
             if (((item.Random || {}).toId || 0) <= 0) {
+              if (this.randoms == null) {
+                throw new Error('randoms 为null！');
+              }
               this.randoms.splice(item.index, 1);
             } else {
+
+              if (this.randomSubs == null) {
+                throw new Error('randomSubs 为null！');
+              }
               this.randomSubs.splice(item.index, 1);
             }
             // this.showRandomList(true, this.currentRemoteItem)
           }
         } else {
-          if (rpObj.Document != null && rpObj.Document.code == CODE_SUCCESS) {
+          if (rpObj.Document != null && rpObj.Document.code == globalVars.CODE_SUCCESS) {
+            if (this.remotes == null) {
+              throw new Error('remotes 为null！');
+            }
             this.remotes.splice(item.index, 1);
             this.showTestCase(true, this.isLocalShow);
           }
@@ -1480,7 +1531,7 @@ export default Vue.extend({
         Helper.alert('名称不能为空！', 'danger');
         return;
       }
-      var val = {
+      var val: HistoryNS.Val = {
         name    : this.history.name,
         type    : this.type,
         url     : '/' + this.getMethod(),
@@ -1489,7 +1540,7 @@ export default Vue.extend({
         header  : vHeader.value,
         random  : vRandom.value
       };
-      var key = String(Date.now());
+      var key                = String(Date.now());
       localforage.setItem(key, val, (err, value) => {
         Helper.alert('保存成功！', 'success');
         this.showSave(false);
@@ -1505,7 +1556,7 @@ export default Vue.extend({
     },
 
     // 删除已保存的
-    remove: function (item, index, isRemote, isRandom) {
+    remove: function (item: IndexedObj, index: number, isRemote: boolean, isRandom?: boolean) {
       if (isRemote == null || isRemote == false) { //null != false
         localforage.removeItem(item.key, () => {
           this.historys.splice(index, 1);
@@ -1517,6 +1568,9 @@ export default Vue.extend({
         }
 
         if (isRandom && (((item || {}).Random || {}).id || 0) <= 0) {
+          if (this.randomSubs == null) {
+            throw new Error('randomSubs 为null！');
+          }
           this.randomSubs.splice(index, 1);
           return;
         }
@@ -1526,7 +1580,7 @@ export default Vue.extend({
     },
 
     // 根据随机测试用例恢复数据
-    restoreRandom       : function (item) {
+    restoreRandom       : function (item: IndexedObj) {
       this.currentRandomItem   = item;
       this.isRandomListShow    = false;
       this.isRandomSubListShow = false;
@@ -1542,19 +1596,19 @@ export default Vue.extend({
       }
     },
     // 根据测试用例/历史记录恢复数据
-    restoreRemoteAndTest: function (item) {
+    restoreRemoteAndTest: function (item: IndexedObj) {
       this.restoreRemote(item, true);
     },
     // 根据测试用例/历史记录恢复数据
-    restoreRemote       : function (item, test) {
+    restoreRemote       : function (item: IndexedObj, test?: boolean) {
       this.currentRemoteItem = item;
       this.restore((item || {}).Document, ((item || {}).TestRecord || {}).response, true, test);
     },
     // 根据历史恢复数据
-    restore             : function (item, response, isRemote, test) {
+    restore             : function (item: IndexedObj, response: string, isRemote?: boolean, test?: boolean) {
       item       = item || {};
       // localforage.getItem(item.key || '', function (err, value) {
-      var branch = new String(item.url || '/get');
+      var branch = String(item.url || '/get');
       if (branch.startsWith('/') == false) {
         branch = '/' + branch;
       }
@@ -1591,14 +1645,14 @@ export default Vue.extend({
 
     // 获取所有保存的json
     listHistory: function () {
-      localforage.iterate( (value, key, iterationNumber) =>{
+      localforage.iterate((value, key, iterationNumber) => {
         if (key[0] !== '#') {
-          value.key = key;
-          this.historys.push(value);
+          (value as HistoryNS.Val).key = key;
+          this.historys.push((value as HistoryNS.Val));
         }
         if (key === '#theme') {
           // 设置默认主题
-          this.checkedTheme = value;
+          this.checkedTheme = value as number;
         }
       });
     },
@@ -1619,28 +1673,33 @@ export default Vue.extend({
           var clazz = StringUtil.trim(this.exTxt.name);
 
           var txt = ''; //配合下面 +=，实现注释判断，一次全生成，方便测试
+
+          if (globalVars.docObj === undefined) {
+            throw new Error('docObj 为undefined！');
+          }
+
           if (clazz.endsWith('.java')) {
-            txt += CodeUtil.parseJavaBean(docObj, clazz.substring(0, clazz.length - 5), this.database);
+            txt += CodeUtil.parseJavaBean(globalVars.docObj, clazz.substring(0, clazz.length - 5), this.database);
           } else if (clazz.endsWith('.swift')) {
-            txt += CodeUtil.parseSwiftStruct(docObj, clazz.substring(0, clazz.length - 6), this.database);
+            txt += CodeUtil.parseSwiftStruct(globalVars.docObj, clazz.substring(0, clazz.length - 6), this.database);
           } else if (clazz.endsWith('.kt')) {
-            txt += CodeUtil.parseKotlinDataClass(docObj, clazz.substring(0, clazz.length - 3), this.database);
+            txt += CodeUtil.parseKotlinDataClass(globalVars.docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.m')) {
-            txt += CodeUtil.parseObjectiveCEntity(docObj, clazz.substring(0, clazz.length - 2), this.database);
+            txt += CodeUtil.parseObjectiveCEntity(globalVars.docObj, clazz.substring(0, clazz.length - 2), this.database);
           } else if (clazz.endsWith('.cs')) {
-            txt += CodeUtil.parseCSharpEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
+            txt += CodeUtil.parseCSharpEntity(globalVars.docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.php')) {
-            txt += CodeUtil.parsePHPEntity(docObj, clazz.substring(0, clazz.length - 4), this.database);
+            txt += CodeUtil.parsePHPEntity(globalVars.docObj, clazz.substring(0, clazz.length - 4), this.database);
           } else if (clazz.endsWith('.go')) {
-            txt += CodeUtil.parseGoEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
+            txt += CodeUtil.parseGoEntity(globalVars.docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.cpp')) {
-            txt += CodeUtil.parseCppStruct(docObj, clazz.substring(0, clazz.length - 4), this.database);
+            txt += CodeUtil.parseCppStruct(globalVars.docObj, clazz.substring(0, clazz.length - 4), this.database);
           } else if (clazz.endsWith('.js')) {
-            txt += CodeUtil.parseJavaScriptEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
+            txt += CodeUtil.parseJavaScriptEntity(globalVars.docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.ts')) {
-            txt += CodeUtil.parseTypeScriptEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
+            txt += CodeUtil.parseTypeScriptEntity(globalVars.docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else if (clazz.endsWith('.py')) {
-            txt += CodeUtil.parsePythonEntity(docObj, clazz.substring(0, clazz.length - 3), this.database);
+            txt += CodeUtil.parsePythonEntity(globalVars.docObj, clazz.substring(0, clazz.length - 3), this.database);
           } else {
             alert('请正确输入对应语言的类名后缀！');
           }
@@ -1657,17 +1716,17 @@ export default Vue.extend({
           var s = '';
           switch (this.language) {
             case CodeUtil.LANGUAGE_KOTLIN:
-              s += '(Kotlin):\n\n' + CodeUtil.parseKotlinResponse('', res, 0, false, !isSingle);
+              s += '(Kotlin):\n\n' + CodeUtil.parseKotlinResponse('', res, 0, false, !globalVars.isSingle);
               break;
             case CodeUtil.LANGUAGE_JAVA:
-              s += '(Java):\n\n' + CodeUtil.parseJavaResponse('', res, 0, false, !isSingle);
+              s += '(Java):\n\n' + CodeUtil.parseJavaResponse('', res, 0, false, !globalVars.isSingle);
               break;
             case CodeUtil.LANGUAGE_C_SHARP:
               s += '(C#):\n\n' + CodeUtil.parseCSharpResponse('', res, 0);
               break;
 
             case CodeUtil.LANGUAGE_SWIFT:
-              s += '(Swift):\n\n' + CodeUtil.parseSwiftResponse('', res, 0, isSingle);
+              s += '(Swift):\n\n' + CodeUtil.parseSwiftResponse('', res, 0, globalVars.isSingle);
               break;
             case CodeUtil.LANGUAGE_OBJECTIVE_C:
               s += '(Objective-C):\n\n' + CodeUtil.parseObjectiveCResponse('', res, 0);
@@ -1677,21 +1736,21 @@ export default Vue.extend({
               s += '(Go):\n\n' + CodeUtil.parseGoResponse('', res, 0);
               break;
             case CodeUtil.LANGUAGE_C_PLUS_PLUS:
-              s += '(C++):\n\n' + CodeUtil.parseCppResponse('', res, 0, isSingle);
+              s += '(C++):\n\n' + CodeUtil.parseCppResponse('', res, 0, globalVars.isSingle);
               break;
 
             case CodeUtil.LANGUAGE_TYPE_SCRIPT:
-              s += '(TypeScript):\n\n' + CodeUtil.parseTypeScriptResponse('', res, 0, isSingle);
+              s += '(TypeScript):\n\n' + CodeUtil.parseTypeScriptResponse('', res, 0, globalVars.isSingle);
               break;
             case CodeUtil.LANGUAGE_JAVA_SCRIPT:
-              s += '(JavaScript):\n\n' + CodeUtil.parseJavaScriptResponse('', res, 0, isSingle);
+              s += '(JavaScript):\n\n' + CodeUtil.parseJavaScriptResponse('', res, 0, globalVars.isSingle);
               break;
 
             case CodeUtil.LANGUAGE_PHP:
-              s += '(PHP):\n\n' + CodeUtil.parsePHPResponse('', res, 0, isSingle);
+              s += '(PHP):\n\n' + CodeUtil.parsePHPResponse('', res, 0, globalVars.isSingle);
               break;
             case CodeUtil.LANGUAGE_PYTHON:
-              s += '(Python):\n\n' + CodeUtil.parsePythonResponse('', res, 0, isSingle);
+              s += '(Python):\n\n' + CodeUtil.parsePythonResponse('', res, 0, globalVars.isSingle);
               break;
             default:
               s += ':\n没有生成代码，可能生成代码(封装,解析)的语言配置错误。 \n';
@@ -1713,7 +1772,7 @@ export default Vue.extend({
           return;
         }
         var isExportRandom = this.isExportRandom;
-        var did            = ((this.currentRemoteItem || {}).Document || {}).id;
+        var did            = (((this.currentRemoteItem || {}) as IndexedObj).Document || {}).id;
         if (isExportRandom && did == null) {
           alert('请先共享测试用例！');
           return;
@@ -1723,14 +1782,19 @@ export default Vue.extend({
 
         var currentAccountId = this.getCurrentAccountId();
         var currentResponse  = StringUtil.isEmpty(this.jsoncon, true) ? {} : this.removeDebugInfo(JSON.parse(this.jsoncon));
-
+        if (currentResponse == null) {
+          throw new Error('currentResponse 为null！');
+        }
         var code = currentResponse.code;
         var thrw = currentResponse.throw;
         delete currentResponse.code; //code必须一致
         delete currentResponse.throw; //throw必须一致
 
-        var isML              = this.isMLEnabled;
-        var stddObj           = isML ? JSONResponse.updateStandard({}, currentResponse) : {};
+        var isML                              = this.isMLEnabled;
+        var stddObj: NullableType<IndexedObj> = isML ? JSONResponse.updateStandard({}, currentResponse) : {};
+        if (stddObj == null) {
+          throw new Error('stddObj 为null！');
+        }
         stddObj.code          = code;
         stddObj.throw         = thrw;
         currentResponse.code  = code;
@@ -1771,18 +1835,18 @@ export default Vue.extend({
           'tag'       : 'Document'
         };
 
-        this.request(true, REQUEST_TYPE_JSON, url, req, {},  (url, res, err) =>{
-          this.onResponse(url, res, err);
+        this.request(true, REQUEST_TYPE_JSON, url, req, {}, (url, res, err) => {
+          this.onResponse(url, res, err as Error);
 
           var rpObj = res.data || {};
 
           if (isExportRandom) {
-            if (rpObj.Random != null && rpObj.Random.code == CODE_SUCCESS) {
+            if (rpObj.Random != null && rpObj.Random.code == globalVars.CODE_SUCCESS) {
               this.randoms = [];
-              this.showRandomList(true, (this.currentRemoteItem || {}).Document);
+              this.showRandomList(true, ((this.currentRemoteItem || {}) as IndexedObj).Document);
             }
           } else {
-            if (rpObj.Document != null && rpObj.Document.code == CODE_SUCCESS) {
+            if (rpObj.Document != null && rpObj.Document.code == globalVars.CODE_SUCCESS) {
               this.remotes = [];
               this.showTestCase(true, false);
 
@@ -1807,15 +1871,15 @@ export default Vue.extend({
                   response: ''
                 },
                 'tag'     : 'Random'
-              }, {},  (url, res, err) => {
-                if (res.data != null && res.data.Random != null && res.data.Random.code == CODE_SUCCESS) {
+              }, {}, (url, res, err) => {
+                if (res.data != null && res.data.Random != null && res.data.Random.code == globalVars.CODE_SUCCESS) {
                   alert('已自动生成并上传随机配置:\n' + config);
                   this.isRandomListShow = true;
                 } else {
                   alert('已自动生成，但上传以下随机配置失败:\n' + config);
                   vRandom.value = config;
                 }
-                this.onResponse(url, res, err);
+                this.onResponse(url, res, err as Error);
               });
             }
           }
@@ -1823,7 +1887,7 @@ export default Vue.extend({
       }
     },
 
-    newRandomConfig: function (path, key, value) {
+    newRandomConfig: function (path: null | string, key: string, value?: Array<any> | object) {
       if (key == null) {
         return '';
       }
@@ -1851,7 +1915,7 @@ export default Vue.extend({
         config += prefix + 'ORDER_IN(undefined, null, []' + val + ')';
       } else if (value instanceof Object) {
         for (var k in value) {
-          var v = value[k];
+          var v = (value as IndexedObj)[k];
 
           var isAPIJSONArray = v instanceof Object && v instanceof Array == false
               && k.startsWith('@') == false && (k.endsWith('[]') || k.endsWith('@'));
@@ -1983,10 +2047,19 @@ export default Vue.extend({
           this.saveCache('', 'types', this.types);
           break;
         case 8:
-          this.getThirdPartyApiList(this.exTxt.name,  (platform, docUrl, listUrl, itemUrl, url_, res, err) => {
+          this.getThirdPartyApiList(this.exTxt.name, (platform, docUrl, listUrl, itemUrl, url_, res, err) => {
             var jsonData   = (res || {}).data;
             var isJSONData = jsonData instanceof Object;
             if (isJSONData == false) {  //后面是 URL 才存储；是 JSON 数据则不存储
+
+              // FIXME 这里，是不是有点问题？？？？？？
+              // FIXME 这里，是不是有点问题？？？？？？
+              // FIXME 这里，是不是有点问题？？？？？？
+              // FIXME 这里，是不是有点问题？？？？？？
+              // FIXME 这里，是不是有点问题？？？？？？
+              // FIXME 这里，是不是有点问题？？？？？？
+              // FIXME 这里，是不是有点问题？？？？？？
+
               this.thirdParty = thirdParty;
               this.saveCache('', 'thirdParty', this.thirdParty);
             }
@@ -1994,13 +2067,13 @@ export default Vue.extend({
             if (platform == PLATFORM_POSTMAN) {
               alert('尚未开发 ' + PLATFORM_POSTMAN);
             } else if (platform == PLATFORM_SWAGGER) {
-              var swaggerCallback = (url_, res, err) => {
+              var swaggerCallback: RequestNS.Cb = (url_, res, err) => {
                 if (this.isSyncing) {
                   alert('正在同步，请等待完成');
                   return;
                 }
                 this.isSyncing = true;
-                this.onResponse(url_, res, err);
+                this.onResponse(url_, res, err as Error);
 
                 var apis = (res.data || {}).paths;
                 if (apis == null) { // || apis.length <= 0) {
@@ -2038,9 +2111,9 @@ export default Vue.extend({
             } else if (platform == PLATFORM_RAP || platform == PLATFORM_YAPI) {
               var isRap = platform == PLATFORM_RAP;
 
-              var itemCallback =  (url, res, err) => {
+              var itemCallback: RequestNS.Cb = (url, res, err) => {
                 try {
-                  this.onResponse(url, res, err);
+                  this.onResponse(url, res, err as Error);
                 } catch (e) {
                 }
 
@@ -2065,13 +2138,13 @@ export default Vue.extend({
               if (isJSONData) {
                 itemCallback(itemUrl, {data: jsonData}, null);
               } else {
-                this.request(false, REQUEST_TYPE_PARAM, listUrl, {}, {},  (url_, res, err) => {
+                this.request(false, REQUEST_TYPE_PARAM, listUrl, {}, {}, (url_, res, err) => {
                   if (this.isSyncing) {
                     alert('正在同步，请等待完成');
                     return;
                   }
                   this.isSyncing = true;
-                  this.onResponse(url_, res, err);
+                  this.onResponse(url_, res, err as Error);
 
                   var apis = (res.data || {}).data;
                   if (apis == null) { // || apis.length <= 0) {
@@ -2116,7 +2189,7 @@ export default Vue.extend({
       }
     },
 
-    getThirdPartyApiList: function (thirdParty, listCallback, itemCallback?:Function) {
+    getThirdPartyApiList(thirdParty: string, listCallback: ThirdParty.ListCb, itemCallback?: ThirdParty.ItemCb) {
       this.parseThirdParty(thirdParty, (platform, jsonData, docUrl, listUrl, itemUrl) => {
         var isJSONData = jsonData instanceof Object;
 
@@ -2128,7 +2201,7 @@ export default Vue.extend({
           } else {
             this.request(false, REQUEST_TYPE_PARAM, docUrl, {}, {}, function (url_, res, err) {
               if (listCallback != null) {
-                listCallback(platform, docUrl, listUrl, itemUrl, url_, res, err);
+                listCallback(platform, docUrl, listUrl, itemUrl, url_, res, err as Error);
               }
             });
           }
@@ -2145,7 +2218,7 @@ export default Vue.extend({
             }
           } else {
             this.request(false, REQUEST_TYPE_PARAM, listUrl, {}, {}, (url_, res, err) => {
-              if (listCallback != null && listCallback(platform, docUrl, listUrl, itemUrl, url_, res, err)) {
+              if (listCallback != null && listCallback(platform, docUrl, listUrl, itemUrl, url_, res, err as Error)) {
                 return;
               }
 
@@ -2169,7 +2242,7 @@ export default Vue.extend({
 
                   this.request(false, REQUEST_TYPE_PARAM, itemUrl + '?id=' + listItem1._id, {}, {}, function (url_, res, err) {
                     if (itemCallback != null) {
-                      itemCallback(platform, docUrl, listUrl, itemUrl, url_, res, err);
+                      itemCallback(platform, docUrl, listUrl, itemUrl, url_, res, err as Error);
                     }
                   });
                 }
@@ -2186,7 +2259,7 @@ export default Vue.extend({
 
     },
 
-    parseThirdParty: function (thirdParty, callback) {
+    parseThirdParty: function (thirdParty: string, callback: ThirdParty.ParseCb) {
       var tp       = StringUtil.trim(thirdParty);
       var index    = tp.indexOf(' ');
       var platform = index < 0 ? PLATFORM_SWAGGER : tp.substring(0, index).toUpperCase();
@@ -2232,7 +2305,7 @@ export default Vue.extend({
      * @param method
      * @param callback
      */
-    uploadSwaggerApi: function (url, docItem, method) {
+    uploadSwaggerApi: function (url: string, docItem: null | IndexedObj, method: null | string) {
       method  = method || 'get';
       var api = docItem == null ? null : docItem[method];
       if (api == null) {
@@ -2266,7 +2339,7 @@ export default Vue.extend({
     /**上传 Rap API
      * @param docItem
      */
-    uploadRapApi: function (docItem) {
+    uploadRapApi: function (docItem: IndexedObj) {
       var api = docItem;
       if (api == null) {
         log('postApi', 'api == null  >> return');
@@ -2337,7 +2410,7 @@ export default Vue.extend({
     /**上传 YApi
      * @param docItem
      */
-    uploadYApi: function (docItem) {
+    uploadYApi: function (docItem: null | IndexedObj) {
       var api = docItem;
       if (api == null) {
         log('postApi', 'api == null  >> return');
@@ -2360,13 +2433,16 @@ export default Vue.extend({
       }
 
       var typeAndParam = this.parseYApiTypeAndParam(api);
-
-      return this.uploadThirdPartyApi(typeAndParam.type, api.title, api.path, typeAndParam.param, header
-          , StringUtil.isEmpty(api.markdown, true) ? api.description : api.markdown);
+      if (typeAndParam == null) {
+        throw new Error('typeAndParam 为null！');
+      }
+      return this.uploadThirdPartyApi((typeAndParam.type as string), api.title, api.path,
+          (typeAndParam.param as Array<any>), header,
+          StringUtil.isEmpty(api.markdown, true) ? api.description : api.markdown);
     },
 
 
-    parseYApiTypeAndParam: function (api) {
+    parseYApiTypeAndParam: function (api: null | IndexedObj) {
       if (api == null) {
         return {};
       }
@@ -2406,8 +2482,8 @@ export default Vue.extend({
       var parameters2 = [];
       if (parameters != null && parameters.length > 0) {
         //过滤掉无效的，避免多拼接 , 导致 req 不是合法 JSON
-        for (var k = 0; k < parameters.length; k++) {
-          var paraItem = parameters[k] || {};
+        for (var _k = 0; _k < parameters.length; _k++) {
+          var paraItem = parameters[_k] || {};
           var name     = paraItem.name || '';
           if (StringUtil.isEmpty(name, true)) {
             continue;
@@ -2436,15 +2512,17 @@ export default Vue.extend({
     },
 
     //上传第三方平台的 API 至 APIAuto
-    uploadThirdPartyApi: function (type, name, url, parameters, header, description) {
+    uploadThirdPartyApi: function (
+        type: string, name: string, url: string, parameters: null | Array<any>, header: string, description: string,
+    ) {
       var req = '{';
 
       if (parameters != null && parameters.length > 0) {
         for (var k = 0; k < parameters.length; k++) {
-          var paraItem = parameters[k] || {};
-          var n        = paraItem.name || '';  //传进来前已过滤，这里只是避免万一为 null 导致后面崩溃
-          var t        = paraItem.type || '';
-          var val      = paraItem.default;
+          var paraItem: IndexedObj = parameters[k] || {};
+          var n                    = paraItem.name || '';  //传进来前已过滤，这里只是避免万一为 null 导致后面崩溃
+          var t                    = paraItem.type || '';
+          var val                  = paraItem.default;
 
           if (val == undefined) {
             if (t == 'boolean') {
@@ -2503,9 +2581,9 @@ export default Vue.extend({
           'response'     : ''
         },
         'tag'       : 'Document'
-      }, {},  (url, res, err) => {
+      }, {}, (url, res, err) => {
         //太卡 this.onResponse(url, res, err)
-        if (res.data != null && res.data.Document != null && res.data.Document.code == CODE_SUCCESS) {
+        if (res.data != null && res.data.Document != null && res.data.Document.code == globalVars.CODE_SUCCESS) {
           this.uploadDoneCount++;
         } else {
           this.uploadFailCount++;
@@ -2525,7 +2603,7 @@ export default Vue.extend({
     },
 
     // 切换主题
-    switchTheme: function (index) {
+    switchTheme: function (index: number) {
       this.checkedTheme = index;
       localforage.setItem('#theme', index);
     },
@@ -2534,7 +2612,7 @@ export default Vue.extend({
     // APIJSON <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     //格式化日期
-    formatDate    : function (date) {
+    formatDate    : function (date: null | Date) {
       if (date == null) {
         date = new Date();
       }
@@ -2554,7 +2632,7 @@ export default Vue.extend({
       return this.formatDate(date) + ' ' + this.formatTime(date);
     },
     //填充0
-    fillZero      : function (num, n) {
+    fillZero      : function (num: null | number | string, n?: null | number) {
       if (num == null) {
         num = 0;
       }
@@ -2570,11 +2648,13 @@ export default Vue.extend({
     },
 
 
-    onClickAccount: function (index, item, callback) {
+    onClickAccount: function (index: string | number, item: null | IndexedObj,
+                              callback?: (isLoggedIn: boolean, index: number, err?: unknown) => void,
+    ) {
       if (this.currentAccountIndex == index) {
         if (item == null) {
           if (callback != null) {
-            callback(false, index);
+            callback(false, index as number);
           }
         } else {
           this.setRememberLogin(item.remember);
@@ -2583,27 +2663,27 @@ export default Vue.extend({
 
           if (item.isLoggedIn) {
             //logout FIXME 没法自定义退出，浏览器默认根据url来管理session的
-            this.logout(false,  (url, res, err) => {
-              this.onResponse(url, res, err);
+            this.logout(false, (url, res, err) => {
+              this.onResponse(url, res, err as Error);
 
               item.isLoggedIn = false;
               this.saveCache(this.getBaseUrl(), 'currentAccountIndex', this.currentAccountIndex);
               this.saveCache(this.getBaseUrl(), 'accounts', this.accounts);
 
               if (callback != null) {
-                callback(false, index, err);
+                callback(false, index as number, err);
               }
             });
           } else {
             //login
-            this.login(false,  (url, res, err) => {
-              this.onResponse(url, res, err);
+            this.login(false, (url, res, err) => {
+              this.onResponse(url, res, err as Error);
 
               var data = res.data || {};
-              var user = data.code == CODE_SUCCESS ? data.user : null;
+              var user = data.code == globalVars.CODE_SUCCESS ? data.user : null;
               if (user == null) {
                 if (callback != null) {
-                  callback(false, index, err);
+                  callback(false, index as number, err);
                 }
               } else {
                 item.name       = user.name;
@@ -2614,7 +2694,7 @@ export default Vue.extend({
                 this.saveCache(this.getBaseUrl(), 'accounts', this.accounts);
 
                 if (callback != null) {
-                  callback(true, index, err);
+                  callback(true, index as number, err);
                 }
               }
             });
@@ -2633,15 +2713,15 @@ export default Vue.extend({
       }
 
       //切换到这个tab
-      this.currentAccountIndex = index;
+      this.currentAccountIndex = index as number;
 
       //目前还没做到同一标签页下测试账号切换后，session也跟着切换，所以干脆每次切换tab就重新登录
       if (item != null) {
         item.isLoggedIn = false;
-        this.onClickAccount(index, item, callback);
+        this.onClickAccount(index as number, item, callback);
       } else {
         if (callback != null) {
-          callback(false, index);
+          callback(false, index as number);
         }
       }
     },
@@ -2666,7 +2746,7 @@ export default Vue.extend({
 
 
     //显示远程的测试用例文档
-    showTestCase: function (show, isLocal) {
+    showTestCase: function (show: boolean, isLocal: boolean) {
       this.isTestCaseShow = show;
       this.isLocalShow    = isLocal;
 
@@ -2689,7 +2769,7 @@ export default Vue.extend({
           var tests = this.tests[String(accountIndex)] || {};
           if (tests != null && $.isEmptyObject(tests) != true) {
             for (var i = 0; i < allCount; i++) {
-              var item = testCases[i];
+              var item: IndexedObj = testCases[i];
               if (item == null) {
                 continue;
               }
@@ -2731,11 +2811,11 @@ export default Vue.extend({
 
         this.onChange(false);
         this.request(true, REQUEST_TYPE_JSON, url, req, {}, (url, res, err) => {
-          this.onResponse(url, res, err);
+          this.onResponse(url, res, err as Error);
 
           var rpObj = res.data;
 
-          if (rpObj != null && rpObj.code === CODE_SUCCESS) {
+          if (rpObj != null && rpObj.code === globalVars.CODE_SUCCESS) {
             this.isTestCaseShow = true;
             this.isLocalShow    = false;
             this.testCases      = this.remotes = rpObj['[]'];
@@ -2807,12 +2887,12 @@ export default Vue.extend({
         };
 
         this.onChange(false);
-        this.request(true, REQUEST_TYPE_JSON, url, req, {},  (url, res, err) => {
-          this.onResponse(url, res, err);
+        this.request(true, REQUEST_TYPE_JSON, url, req, {}, (url, res, err) => {
+          this.onResponse(url, res, err as Error);
 
           var rpObj = res.data;
 
-          if (rpObj != null && rpObj.code === CODE_SUCCESS) {
+          if (rpObj != null && rpObj.code === globalVars.CODE_SUCCESS) {
             this.isRandomListShow    = !isSub;
             this.isRandomSubListShow = isSub;
             if (isSub) {
@@ -2837,22 +2917,22 @@ export default Vue.extend({
     // 设置文档
     showDoc: function () {
       if (this.setDoc(doc) == false) {
-        this.getDoc( (d) => {
+        this.getDoc((d) => {
           this.setDoc(d);
         });
       }
     },
 
 
-    saveCache: function (url, key, value) {
+    saveCache: function (url: string, key: string, value: any) {
       var cache  = this.getCache(url);
       cache[key] = value;
       localStorage.setItem('APIAuto:' + url, JSON.stringify(cache));
     },
-    getCache : function (url, key) {
-      var cache = localStorage.getItem('APIAuto:' + url);
+    getCache(url: string, key?: string) {
+      let cache: UndefinedAbleType<IndexedObj> = undefined;
       try {
-        cache = JSON.parse(cache);
+        cache = JSON.parse(localStorage.getItem('APIAuto:' + url) || '{}');
       } catch (e) {
         this.log('login  this.send >> try { cache = JSON.parse(cache) } catch(e) {\n' + e.message);
       }
@@ -2876,7 +2956,7 @@ export default Vue.extend({
       }
     },
 
-    showLogin: function (show, isAdmin) {
+    showLogin: function (show: boolean, isAdmin?: boolean) {
       this.isLoginShow      = show;
       this.isAdminOperation = isAdmin;
 
@@ -2900,7 +2980,7 @@ export default Vue.extend({
       this.password = user.password;
     },
 
-    setRememberLogin(remember) {
+    setRememberLogin(remember?: boolean) {
       vRemember.checked = remember || false;
     },
 
@@ -2914,7 +2994,7 @@ export default Vue.extend({
 
     /**登录
      */
-    login: function (isAdminOperation, callback) {
+    login: function (isAdminOperation: boolean | undefined, callback?: RequestNS.Cb) {
       this.isLoginShow = false;
 
       const req = {
@@ -2939,7 +3019,7 @@ export default Vue.extend({
 
           var rpObj = res.data || {};
 
-          if (rpObj.code != CODE_SUCCESS) {
+          if (rpObj.code != globalVars.CODE_SUCCESS) {
             alert('登录失败，请检查网络后重试。\n' + rpObj.msg + '\n详细信息可在浏览器控制台查看。');
           } else {
             var user = rpObj.user || {};
@@ -2990,11 +3070,11 @@ export default Vue.extend({
             return;
           }
 
-          this.onResponse(url, res, err);
+          this.onResponse(url, res, err as Error);
 
           //由login按钮触发，不能通过callback回调来实现以下功能
           var data = res.data || {};
-          if (data.code == CODE_SUCCESS) {
+          if (data.code == globalVars.CODE_SUCCESS) {
             var user = data.user || {};
             this.accounts.push({
               isLoggedIn: true,
@@ -3021,7 +3101,7 @@ export default Vue.extend({
 
     /**注册
      */
-    register: function (isAdminOperation) {
+    register: function (isAdminOperation: boolean | undefined) {
       this.showUrl(isAdminOperation, '/register');
       vInput.value = JSON.stringify(
           {
@@ -3038,11 +3118,11 @@ export default Vue.extend({
       this.showTestCase(false, false);
       this.onChange(false);
       this.send(isAdminOperation, (url, res, err) => {
-        this.onResponse(url, res, err);
+        this.onResponse(url, res, err as Error);
 
         var rpObj = res.data;
 
-        if (rpObj != null && rpObj.code === CODE_SUCCESS) {
+        if (rpObj != null && rpObj.code === globalVars.CODE_SUCCESS) {
           alert('注册成功');
 
           var privacy = rpObj.Privacy || {};
@@ -3055,7 +3135,7 @@ export default Vue.extend({
 
     /**重置密码
      */
-    resetPassword: function (isAdminOperation) {
+    resetPassword: function (isAdminOperation: boolean | undefined) {
       this.showUrl(isAdminOperation, '/put/password');
       vInput.value = JSON.stringify(
           {
@@ -3069,11 +3149,11 @@ export default Vue.extend({
       this.showTestCase(false, this.isLocalShow);
       this.onChange(false);
       this.send(isAdminOperation, (url, res, err) => {
-        this.onResponse(url, res, err);
+        this.onResponse(url, res, err as Error);
 
         var rpObj = res.data;
 
-        if (rpObj != null && rpObj.code === CODE_SUCCESS) {
+        if (rpObj != null && rpObj.code === globalVars.CODE_SUCCESS) {
           alert('重置密码成功');
 
           var privacy = rpObj.Privacy || {};
@@ -3086,7 +3166,7 @@ export default Vue.extend({
 
     /**退出
      */
-    logout: function (isAdminOperation, callback) {
+    logout: function (isAdminOperation: boolean, callback?: RequestNS.Cb) {
       var req = {};
 
       if (isAdminOperation) {
@@ -3105,7 +3185,7 @@ export default Vue.extend({
           // alert('logout  clear admin ')
 
           this.clearUser();
-          this.onResponse(url, res, err);
+          this.onResponse(url, res, err as Error);
           this.showTestCase(false, this.isLocalShow);
         });
       } else {
@@ -3120,7 +3200,7 @@ export default Vue.extend({
 
     /**获取验证码
      */
-    getVerify: function (isAdminOperation) {
+    getVerify: function (isAdminOperation: boolean) {
       this.showUrl(isAdminOperation, '/post/verify');
       var type     = this.loginType == 'login' ? 0 : (this.loginType == 'register' ? 1 : 2);
       vInput.value = JSON.stringify(
@@ -3132,10 +3212,10 @@ export default Vue.extend({
       this.showTestCase(false, this.isLocalShow);
       this.onChange(false);
       this.send(isAdminOperation, (url, res, err) => {
-        this.onResponse(url, res, err);
+        this.onResponse(url, res, err as Error);
 
         var data   = res.data || {};
-        var obj    = data.code == CODE_SUCCESS ? data.verify : null;
+        var obj    = data.code == globalVars.CODE_SUCCESS ? data.verify : null;
         var verify = obj == null ? null : obj.verify;
         if (verify != null) { //FIXME isEmpty校验时居然在verify=null! StringUtil.isEmpty(verify, true) == false) {
           vVerify.value = verify;
@@ -3152,7 +3232,7 @@ export default Vue.extend({
 
     /**计时回调
      */
-    onHandle: function (before) {
+    onHandle: function (before: string) {
       this.isDelayShow = false;
       if (inputted != before) {
         clearTimeout(handler);
@@ -3204,7 +3284,7 @@ export default Vue.extend({
               + '\nError:\n' + e.message + '\n\n\n';
         }
 
-        if (isSingle) {
+        if (globalVars.isSingle) {
           if (before.indexOf('"') >= 0) {
             before = before.replace(/"/g, '\'');
           }
@@ -3225,19 +3305,19 @@ export default Vue.extend({
 
         try {
           var m = this.getMethod();
-          var c = isSingle ? '' : StringUtil.trim(CodeUtil.parseComment(after, docObj == null ? null : docObj['[]'], m, this.database, this.language, '/' + this.getMethod(), true))
+          var c = globalVars.isSingle ? '' : StringUtil.trim(CodeUtil.parseComment(after, globalVars.docObj == null ? null : globalVars.docObj['[]'], m, this.database, this.language, '/' + this.getMethod(), true))
               + '\n                                                                                                       '
               + '                                                                                                       \n';  //解决遮挡
           //TODO 统计行数，补全到一致 vInput.value.lineNumbers
 
-          if (isSingle != true && afterObj.tag == null) {
+          if (globalVars.isSingle != true && afterObj.tag == null) {
             m = m == null ? 'GET' : m.toUpperCase();
             if (['GETS', 'HEADS', 'POST', 'PUT', 'DELETE'].indexOf(m) >= 0) {
               c += ' ! 非开放请求必须设置 tag ！例如 "tag": "User"';
             }
           }
           vComment.value    = c;
-          vUrlComment.value = isSingle || StringUtil.isEmpty(this.urlComment, true)
+          vUrlComment.value = globalVars.isSingle || StringUtil.isEmpty(this.urlComment, true)
               ? '' : vUrl.value + CodeUtil.getComment(this.urlComment, false, '  ')
               + ' - ' + (this.requestVersion > 0 ? 'V' + this.requestVersion : 'V*');
 
@@ -3260,7 +3340,7 @@ export default Vue.extend({
 
     /**输入内容改变
      */
-    onChange: function (delay) {
+    onChange: function (delay: boolean) {
       this.setBaseUrl();
       inputted          = String(vInput.value);
       vComment.value    = '';
@@ -3270,7 +3350,7 @@ export default Vue.extend({
 
       this.isDelayShow = delay;
 
-      handler = window.setTimeout( () => {
+      handler = window.setTimeout(() => {
         this.onHandle(inputted);
       }, delay ? 2 * 1000 : 0);
     },
@@ -3278,7 +3358,7 @@ export default Vue.extend({
     /**单双引号切换
      */
     transfer: function () {
-      isSingle = !isSingle;
+      globalVars.isSingle = !globalVars.isSingle;
 
       this.isTestCaseShow = false;
 
@@ -3296,7 +3376,7 @@ export default Vue.extend({
 
     /**获取显示的请求类型名称
      */
-    getTypeName: function (type) {
+    getTypeName: function (type: string) {
       var ts = this.types;
       var t  = type || REQUEST_TYPE_JSON;
       if (ts == null || ts.length <= 1 || (ts.length <= 2 && ts.indexOf(REQUEST_TYPE_PARAM) >= 0 && ts.indexOf(REQUEST_TYPE_GRPC) < 0)) {
@@ -3309,6 +3389,11 @@ export default Vue.extend({
     changeType : function () {
       var count = this.types == null ? 0 : this.types.length;
       if (count > 1) {
+
+        if (this.types == null) {
+          throw new Error('types 为null');
+        }
+
         var index = this.types.indexOf(this.type);
         index++;
         this.type = this.types[index % count];
@@ -3319,7 +3404,7 @@ export default Vue.extend({
       if (index >= 0) {
         var params = StringUtil.split(url.substring(index + 1), '&');
 
-        var paramObj = {};
+        var paramObj: IndexedObj = {};
         var p;
         var v;
         var ind;
@@ -3355,10 +3440,10 @@ export default Vue.extend({
     /**
      * 删除注释
      */
-    removeComment: function (json) {
+    removeComment: function (json: string) {
       var reg = /("([^\\\"]*(\\.)?)*")|('([^\\\']*(\\.)?)*')|(\/{2,}.*?(\r|\n))|(\/\*(\n|.)*?\*\/)/g; // 正则表达式
       try {
-        return new String(json).replace(reg, function (word) { // 去除注释后的文本
+        return String(json).replace(reg, function (word) { // 去除注释后的文本
           return /^\/{2,}/.test(word) || /^\/\*/.test(word) ? '' : word;
         });
       } catch (e) {
@@ -3367,7 +3452,7 @@ export default Vue.extend({
       return json;
     },
 
-    showAndSend: function (branchUrl, req, isAdminOperation, callback) {
+    showAndSend: function (branchUrl: string, req: any, isAdminOperation: boolean, callback: RequestNS.Cb) {
       this.showUrl(isAdminOperation, branchUrl);
       vInput.value = JSON.stringify(req, null, '    ');
       this.showTestCase(false, this.isLocalShow);
@@ -3377,7 +3462,7 @@ export default Vue.extend({
 
     /**发送请求
      */
-    send: function (isAdminOperation: boolean, callback?: Function) {
+    send: function (isAdminOperation: boolean | undefined, callback?: RequestNS.Cb) {
       if (this.isTestCaseShow) {
         alert('请先输入请求内容！');
         return;
@@ -3413,6 +3498,10 @@ export default Vue.extend({
       this.view     = 'output';
 
 
+      if (req == undefined) {
+        throw new Error('req 为undefined！');
+      }
+
       this.setBaseUrl();
       this.request(isAdminOperation, this.type, url, req, isAdminOperation ? {} : header, callback);
 
@@ -3435,7 +3524,7 @@ export default Vue.extend({
     },
 
     //请求
-    request: function (isAdminOperation, type, url, req, header, callback) {
+    request: function (isAdminOperation: boolean | undefined, type: string, url: string, req: null | IndexedObj | undefined, header: null | IndexedObj, callback?: RequestNS.Cb) {
       type = type || REQUEST_TYPE_JSON;
 
       if (header != null && header.Cookie != null) {
@@ -3457,7 +3546,7 @@ export default Vue.extend({
         withCredentials: true, //Cookie 必须要  type == REQUEST_TYPE_JSON
         // crossDomain: true
       })
-          .then( (res) => {
+          .then((res) => {
             res = res || {};
             //any one of then callback throw error will cause it calls then(null)
             // if ((res.config || {}).method == 'options') {
@@ -3487,7 +3576,7 @@ export default Vue.extend({
             }
             this.onResponse(url, res, null);
           })
-          .catch( (err) => {
+          .catch((err) => {
             log('send >> error:\n' + err);
             if (callback != null) {
               callback(url, {}, err);
@@ -3500,7 +3589,7 @@ export default Vue.extend({
 
     /**请求回调
      */
-    onResponse: function (url, res, err) {
+    onResponse: function (url: string, res: null | IndexedObj, err: null | Error) {
       if (res == null) {
         res = {};
       }
@@ -3509,7 +3598,7 @@ export default Vue.extend({
         vOutput.value = 'Response:\nurl = ' + url + '\nerror = ' + err.message;
       } else {
         var data = res.data || {};
-        if (isSingle && data.code == CODE_SUCCESS) { //不格式化错误的结果
+        if (globalVars.isSingle && data.code == globalVars.CODE_SUCCESS) { //不格式化错误的结果
           data = JSONResponse.formatObject(data);
         }
         this.jsoncon  = JSON.stringify(data, null, '    ');
@@ -3522,7 +3611,8 @@ export default Vue.extend({
     /**处理按键事件
      * @param event
      */
-    doOnKeyUp: function (event, type, isFilter, item) {
+    doOnKeyUp: function (__event: Event, type?: null | string, isFilter?: boolean, item?: null | IndexedObj) {
+      const event = __event as KeyboardEvent;
       var keyCode = event.keyCode ? event.keyCode : (event.which ? event.which : event.charCode);
       if (keyCode == 13) { // enter
         if (isFilter) {
@@ -3551,13 +3641,13 @@ export default Vue.extend({
               name : r.name
             },
             tag   : 'Random'
-          }, {},  (url, res, err) => {
+          }, {}, (url, res, err) => {
 
-            var isOk = (res.data || {}).code == CODE_SUCCESS;
+            var isOk = (res.data || {}).code == globalVars.CODE_SUCCESS;
 
             var msg = isOk ? '' : ('\nmsg: ' + StringUtil.get((res.data || {}).msg));
             if (err != null) {
-              msg += '\nerr: ' + err.msg;
+              msg += '\nerr: ' + (err as { msg: string }).msg;
             }
             alert('修改' + (isOk ? '成功' : '失败')
                 + '！\ncount: ' + r.count + '\nname: ' + r.name
@@ -3588,7 +3678,7 @@ export default Vue.extend({
       }
     },
 
-    pageDown      : function (type) {
+    pageDown      : function (type: null | string) {
       type = type || '';
       var page;
       switch (type) {
@@ -3630,7 +3720,7 @@ export default Vue.extend({
         this.onFilterChange(type);
       }
     },
-    pageUp        : function (type) {
+    pageUp        : function (type: null | string) {
       type = type || '';
       switch (type) {
         case 'testCase':
@@ -3648,7 +3738,7 @@ export default Vue.extend({
       }
       this.onFilterChange(type);
     },
-    onFilterChange: function (type) {
+    onFilterChange: function (type?: null | string) {
       type = type || '';
       switch (type) {
         case 'testCase':
@@ -3663,18 +3753,18 @@ export default Vue.extend({
           this.saveCache(this.server, 'randomCount', this.randomCount);
 
           this.randoms = null;
-          this.showRandomList(true, (this.currentRemoteItem || {}).Document, false);
+          this.showRandomList(true, ((this.currentRemoteItem || {}) as any).Document, false);
           break;
         case 'randomSub':
           this.saveCache(this.server, 'randomSubPage', this.randomSubPage);
           this.saveCache(this.server, 'randomSubCount', this.randomSubCount);
 
           this.randomSubs = null;
-          this.showRandomList(true, (this.currentRemoteItem || {}).Random, true);
+          this.showRandomList(true, ((this.currentRemoteItem || {}) as any).Random, true);
           break;
         default:
-          docObj = null;
-          doc    = null;
+          globalVars.docObj = null;
+          doc               = null;
           this.saveCache(this.server, 'page', this.page);
           this.saveCache(this.server, 'count', this.count);
           // this.saveCache(this.server, 'docObj', null)
@@ -3695,27 +3785,27 @@ export default Vue.extend({
     /**转为请求代码
      * @param rq
      */
-    getCode: function (rq) {
+    getCode: function (rq: string) {
       var s = '\n\n\n### 请求代码(自动生成) \n';
       switch (this.language) {
         case CodeUtil.LANGUAGE_KOTLIN:
           s += '\n#### <= Android-Kotlin: 空对象用 HashMap&lt;String, Any&gt;()，空数组用 ArrayList&lt;Any&gt;()\n'
               + '```kotlin \n'
-              + CodeUtil.parseKotlinRequest(null, JSON.parse(rq), 0, isSingle, false, false, this.type, this.getBaseUrl(), '/' + this.getMethod(), this.urlComment)
+              + CodeUtil.parseKotlinRequest(null, JSON.parse(rq), 0, globalVars.isSingle, false, false, this.type, this.getBaseUrl(), '/' + this.getMethod(), this.urlComment)
               + '\n ``` \n注：对象 {} 用 mapOf("key": value)，数组 [] 用 listOf(value0, value1)\n';
           break;
         case CodeUtil.LANGUAGE_JAVA:
           s += '\n#### <= Android-Java: 同名变量需要重命名'
               + ' \n ```java \n'
-              + StringUtil.trim(CodeUtil.parseJavaRequest(null, JSON.parse(rq), 0, isSingle, false, false, this.type, '/' + this.getMethod(), this.urlComment))
-              + '\n ``` \n注：' + (isSingle ? '用了 APIJSON 的 JSONRequest, JSONResponse 类，也可使用其它类封装，只要 JSON 有序就行\n' : 'LinkedHashMap&lt;&gt;() 可替换为 fastjson 的 JSONObject(true) 等有序JSON构造方法\n');
+              + StringUtil.trim(CodeUtil.parseJavaRequest(null, JSON.parse(rq), 0, globalVars.isSingle, false, false, this.type, '/' + this.getMethod(), this.urlComment))
+              + '\n ``` \n注：' + (globalVars.isSingle ? '用了 APIJSON 的 JSONRequest, JSONResponse 类，也可使用其它类封装，只要 JSON 有序就行\n' : 'LinkedHashMap&lt;&gt;() 可替换为 fastjson 的 JSONObject(true) 等有序JSON构造方法\n');
 
-          var serverCode = CodeUtil.parseJavaServer(this.type, '/' + this.getMethod(), this.database, this.schema, JSON.parse(rq), isSingle);
+          var serverCode = CodeUtil.parseJavaServer(this.type, '/' + this.getMethod(), this.database, this.schema, JSON.parse(rq), globalVars.isSingle);
           if (StringUtil.isEmpty(serverCode, true) != true) {
             s += '\n#### <= Server-Java: RESTful 等非 APIJSON 规范的 API'
                 + ' \n ```java \n'
                 + serverCode
-                + '\n ``` \n注：' + (isSingle ? '分页和排序用了 Mybatis-PageHelper，如不需要可在生成代码基础上修改\n' : '使用 SSM(Spring + SpringMVC + Mybatis) 框架 \n');
+                + '\n ``` \n注：' + (globalVars.isSingle ? '分页和排序用了 Mybatis-PageHelper，如不需要可在生成代码基础上修改\n' : '使用 SSM(Spring + SpringMVC + Mybatis) 框架 \n');
           }
           break;
         case CodeUtil.LANGUAGE_C_SHARP:
@@ -3746,21 +3836,21 @@ export default Vue.extend({
         case CodeUtil.LANGUAGE_C_PLUS_PLUS:
           s += '\n#### <= Web-C++: 使用 RapidJSON'
               + ' \n ```cpp \n'
-              + StringUtil.trim(CodeUtil.parseCppRequest(null, JSON.parse(rq), 0, isSingle))
+              + StringUtil.trim(CodeUtil.parseCppRequest(null, JSON.parse(rq), 0, globalVars.isSingle))
               + '\n ``` \n注：std::string 类型值需要判断 RAPIDJSON_HAS_STDSTRING\n';
           break;
 
         case CodeUtil.LANGUAGE_PHP:
-          s += '\n#### <= Web-PHP: 空对象用 (object) ' + (isSingle ? '[]' : 'array()')
+          s += '\n#### <= Web-PHP: 空对象用 (object) ' + (globalVars.isSingle ? '[]' : 'array()')
               + ' \n ```php \n'
-              + CodeUtil.parsePHPRequest(null, JSON.parse(rq), 0, isSingle)
-              + '\n ``` \n注：对象 {} 用 ' + (isSingle ? '[\'key\' => value]' : 'array("key" => value)') + '，数组 [] 用 ' + (isSingle ? '[value0, value1]\n' : 'array(value0, value1)\n');
+              + CodeUtil.parsePHPRequest(null, JSON.parse(rq), 0, globalVars.isSingle)
+              + '\n ``` \n注：对象 {} 用 ' + (globalVars.isSingle ? '[\'key\' => value]' : 'array("key" => value)') + '，数组 [] 用 ' + (globalVars.isSingle ? '[value0, value1]\n' : 'array(value0, value1)\n');
           break;
 
         case CodeUtil.LANGUAGE_PYTHON:
           s += '\n#### <= Web-Python: 注释符用 \'\#\''
               + ' \n ```python \n'
-              + CodeUtil.parsePythonRequest(null, JSON.parse(rq), 0, isSingle, vInput.value)
+              + CodeUtil.parsePythonRequest(null, JSON.parse(rq), 0, globalVars.isSingle, vInput.value)
               + '\n ``` \n注：关键词转换 null: None, false: False, true: True';
           break;
 
@@ -3796,7 +3886,7 @@ export default Vue.extend({
     /**显示文档
      * @param d
      **/
-    setDoc: function (d) {
+    setDoc: function (d: null | string) {
       if (d == null) { //解决死循环 || d == '') {
         return false;
       }
@@ -3820,7 +3910,7 @@ export default Vue.extend({
     /**
      * 获取文档
      */
-    getDoc: function (callback) {
+    getDoc: function (callback: (str: string) => void) {
 
       var count = this.count || 100;  //超过就太卡了
       var page  = this.page || 0;
@@ -3937,7 +4027,7 @@ export default Vue.extend({
             // '@combine': search == null ? null : 'tag$,detail$',
           }
         }
-      }, {},  (url, res, err) => {
+      }, {}, (url, res, err) => {
         if (err != null || res == null || res.data == null) {
           log('getDoc  err != null || res == null || res.data == null >> return;');
           callback('');
@@ -3945,14 +4035,14 @@ export default Vue.extend({
         }
 
 //      log('getDoc  docRq.responseText = \n' + docRq.responseText);
-        docObj = res.data || {};  //避免后面又调用 onChange ，onChange 又调用 getDoc 导致死循环
+        globalVars.docObj = res.data || {};  //避免后面又调用 onChange ，onChange 又调用 getDoc 导致死循环
 
         //转为文档格式
         var doc = '';
         var item;
 
         //[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        var list           = docObj == null ? null : docObj['[]'];
+        var list           = globalVars.docObj == null ? null : globalVars.docObj['[]'];
         CodeUtil.tableList = list;
         if (list != null) {
           if (DEBUG) {
@@ -4040,7 +4130,7 @@ export default Vue.extend({
 
 
         //Access[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        list = docObj == null ? null : docObj['Access[]'];
+        list = globalVars.docObj == null ? null : globalVars.docObj['Access[]'];
         if (list != null) {
           if (DEBUG) {
             log('getDoc  Access[] = \n' + format(JSON.stringify(list)));
@@ -4079,7 +4169,7 @@ export default Vue.extend({
 
 
         //Function[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        list = docObj == null ? null : docObj['Function[]'];
+        list = globalVars.docObj == null ? null : globalVars.docObj['Function[]'];
         if (list != null) {
           if (DEBUG) {
             log('getDoc  Function[] = \n' + format(JSON.stringify(list)));
@@ -4108,7 +4198,7 @@ export default Vue.extend({
 
 
         //Request[] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-        list = docObj == null ? null : docObj['Request[]'];
+        list = globalVars.docObj == null ? null : globalVars.docObj['Request[]'];
         if (list != null) {
           if (DEBUG) {
             log('getDoc  Request[] = \n' + format(JSON.stringify(list)));
@@ -4147,7 +4237,7 @@ export default Vue.extend({
 
     },
 
-    toDoubleJSON: function (json, defaultValue) {
+    toDoubleJSON: function (json: string, defaultValue?: IndexedObj | Array<any> | null) {
       if (StringUtil.isEmpty(json)) {
         return defaultValue == null ? '{}' : JSON.stringify(defaultValue);
       } else if (json.indexOf('\'') >= 0) {
@@ -4160,7 +4250,7 @@ export default Vue.extend({
      * @param s
      * @return {*}
      */
-    toMD: function (s) {
+    toMD: function (s: null | string) {
       if (s == null) {
         s = '';
       } else {
@@ -4177,7 +4267,7 @@ export default Vue.extend({
      * @param tag
      * @return {*}
      */
-    getStructure: function (obj, tag) {
+    getStructure: function (obj: null | Array<any> | IndexedObj, tag?: string) {
       if (obj == null) {
         return null;
       }
@@ -4193,13 +4283,13 @@ export default Vue.extend({
         var nk;
         for (var k in obj) {
           if (k == null || k == '' || k == 'INSERT' || k == 'REMOVE' || k == 'REPLACE' || k == 'UPDATE') {
-            delete obj[k];
+            delete (obj as IndexedObj)[k];
             continue;
           }
 
-          v = obj[k];
+          v = (obj as IndexedObj)[k];
           if (v == null) {
-            delete obj[k];
+            delete (obj as IndexedObj)[k];
             continue;
           }
 
@@ -4224,29 +4314,29 @@ export default Vue.extend({
           }
 
           if (nk != null) {
-            obj[nk] = v;
-            delete obj[k];
+            (obj as IndexedObj)[nk] = v;
+            delete (obj as IndexedObj)[k];
           }
         }
 
-        if (tag != null && obj[tag] == null) { //补全省略的Table
+        if (tag != null && (obj as IndexedObj)[tag] == null) { //补全省略的Table
           var isArrayKey = tag.endsWith(':[]');  //JSONObject.isArrayKey(tag);
           var key        = isArrayKey ? tag.substring(0, tag.length - 3) : tag;
 
           if (this.isTableKey(key)) {
             if (isArrayKey) { //自动为 tag = Comment:[] 的 { ... } 新增键值对 "Comment[]":[] 为 { "Comment[]":[], ... }
-              obj[key + '[]'] = [];
+              (obj as IndexedObj)[key + '[]'] = [];
             } else { //自动为 tag = Comment 的 { ... } 包一层为 { "Comment": { ... } }
-              var realObj  = {};
-              realObj[tag] = obj;
-              obj          = realObj;
+              var realObj: IndexedObj = {};
+              realObj[tag]            = obj;
+              obj                     = realObj;
             }
           }
         }
 
       }
 
-      obj.tag = tag; //补全tag
+      (obj as IndexedObj).tag = tag; //补全tag
 
       log('getStructure  return obj; = \n' + format(JSON.stringify(obj)));
 
@@ -4257,7 +4347,7 @@ export default Vue.extend({
      * @param key
      * @return
      */
-    isTableKey: function (key) {
+    isTableKey: function (key: null | string) {
       log('isTableKey  typeof key = ' + (typeof key));
       if (key == null) {
         return false;
@@ -4265,7 +4355,7 @@ export default Vue.extend({
       return /^[A-Z][A-Za-z0-9_]*$/.test(key);
     },
 
-    log: function (msg) {
+    log: function (msg: string) {
       // this.log('Main.  ' + msg)
     },
 
@@ -4284,13 +4374,13 @@ export default Vue.extend({
       return doc;
     },
 
-    enableCross: function (enable) {
+    enableCross: function (enable: boolean) {
       this.isCrossEnabled = enable;
       this.crossProcess   = enable ? '交叉账号:已开启' : '交叉账号:已关闭';
       this.saveCache(this.server, 'isCrossEnabled', enable);
     },
 
-    enableML: function (enable) {
+    enableML: function (enable: boolean) {
       this.isMLEnabled = enable;
       this.testProcess = enable ? '机器学习:已开启' : '机器学习:已关闭';
       this.saveCache(this.server, 'isMLEnabled', enable);
@@ -4304,7 +4394,7 @@ export default Vue.extend({
     onClickTestRandom: function () {
       this.testRandom(!this.isRandomListShow && !this.isRandomSubListShow, this.isRandomListShow, this.isRandomSubListShow);
     },
-    testRandom       : function (show, testList, testSubList, limit) {
+    testRandom       : function (show: boolean, testList: boolean, testSubList?: boolean, limit?: null | number) {
       this.isRandomEditable = false;
       if (testList != true && testSubList != true) {
         this.testRandomProcess = '';
@@ -4359,18 +4449,23 @@ export default Vue.extend({
           const itemAllCount = random.count || 0;
           allCount += (itemAllCount - 1);
 
-          this.testRandomSingle(show, false, itemAllCount > 1 && !testSubList, item, this.type, url, json, header,  (url, res, err) => {
+          this.testRandomSingle(show, false, itemAllCount > 1 && !testSubList, item, this.type, url, json, header, (url, res, err) => {
+
+            if (res == null) {
+              throw new Error('res 为null！');
+            }
 
             doneCount++;
             this.testRandomProcess = doneCount >= allCount ? '' : ('正在测试: ' + doneCount + '/' + allCount);
             try {
-              this.onResponse(url, res, err);
+              this.onResponse(url, res, err as Error);
+
               this.log('test  this.request >> res.data = ' + JSON.stringify(res.data, null, '  '));
             } catch (e) {
               this.log('test  this.request >> } catch (e) {\n' + e.message);
             }
 
-            this.compareResponse(allCount, list, index, item, res.data, true, this.currentAccountIndex, false, err);
+            this.compareResponse(allCount, list, index, item, res.data, true, this.currentAccountIndex, false, err as Error);
           });
         }
       }
@@ -4379,7 +4474,9 @@ export default Vue.extend({
      * @param show
      * @param callback
      */
-    testRandomSingle : function (show, testList, testSubList, item, type, url, json, header, callback) {
+    testRandomSingle : function (show: boolean, testList: unknown, testSubList: boolean, item: null | IndexedObj, type: string, url: string, json: any, header: null | IndexedObj,
+                                 callback: null | RequestNS.Cb,
+    ) {
       item           = item || {};
       var random     = item.Random = item.Random || {};
       var subs       = item['[]'] || [];
@@ -4393,12 +4490,16 @@ export default Vue.extend({
         // var constConfig = i < existCount ? ((subs[i] || {}).Random || {}).config : this.getRandomConstConfig(random.config, random.id) //第1遍，把 key : expression 改为 key : value
         // var constJson = this.getRandomJSON(JSON.parse(JSON.stringify(json)), constConfig, random.id) //第2遍，用新的 random config 来修改原 json
 
-        const which   = i;
-        var rawConfig = testSubList && i < existCount ? ((subs[i] || {}).Random || {}).config : random.config;
+        const which               = i;
+        var rawConfig: IndexedObj = testSubList && (i < existCount
+            ? ((subs[i] || {}).Random || {}).config
+            : random.config);
         this.parseRandom(
-            JSON.parse(JSON.stringify(json)), rawConfig, random.id
-            , !testSubList, testSubList && i >= existCount, testSubList && i >= existCount
-            ,  (randomName, constConfig, constJson) => {
+            JSON.parse(JSON.stringify(json)), rawConfig, random.id,
+            !testSubList,
+            testSubList && i >= existCount,
+            testSubList && i >= existCount,
+            (randomName, constConfig, constJson) => {
 
               respCount++;
 
@@ -4431,14 +4532,13 @@ export default Vue.extend({
                   };
                 }
               } else {
-                var cb =  (url, res, err) => {
+                var cb: RequestNS.Cb = (url, res, err) => {
                   if (callback != null) {
                     callback(url, res, err, random);
                   } else {
-                    this.onResponse(url, res, err);
+                    this.onResponse(url, res, err as Error);
                   }
                 };
-
                 if (show == true) {
                   vInput.value = JSON.stringify(constJson, null, '    ');
                   this.send(false, cb);
@@ -4450,6 +4550,9 @@ export default Vue.extend({
               if (testSubList && respCount >= count) { // && which >= count - 1) {
                 this.randomSubs = subs;
                 if (this.isRandomListShow == true) {
+                  if (item == null) {
+                    throw new Error('item 为null');
+                  }
                   this.resetCount(item);
                   item.subs = subs;
                 }
@@ -4463,7 +4566,7 @@ export default Vue.extend({
 
     },
 
-    resetCount: function (randomItem) {
+    resetCount: function (randomItem: null | IndexedObj) {
       if (randomItem == null) {
         this.log('resetCount  randomItem == null >> return');
         return;
@@ -4480,11 +4583,12 @@ export default Vue.extend({
      * @param show
      * @param callback
      */
-    testRandomWithText: function (show, callback) {
+    testRandomWithText: function (show: boolean, callback: null | RequestNS.Cb) {
       try {
         var count                = this.testRandomCount || 0;
         this.isRandomSubListShow = count > 1;
-        this.testRandomSingle(show, false, this.isRandomSubListShow, {
+        this.testRandomSingle(show, false, this.isRandomSubListShow,
+            {
               Random: {
                 toId  : 0, // ((this.currentRandomItem || {}).Random || {}).id || 0,
                 userId: (this.User || {}).id,
@@ -4493,7 +4597,9 @@ export default Vue.extend({
                 config: vRandom.value
               }
             },
-            this.type, this.getUrl(), this.getRequest(vInput.value), this.getHeader(vHeader.value), callback
+            this.type, this.getUrl(), this.getRequest(vInput.value),
+            this.getHeader(vHeader.value),
+            callback,
         );
       } catch (e) {
         log(e);
@@ -4521,7 +4627,9 @@ export default Vue.extend({
      * @param show
      * @param callback
      */
-    parseRandom: function (json, config, randomId, generateJSON, generateConfig, generateName, callback) {
+    parseRandom: function (json: any, config: IndexedObj, randomId: number, generateJSON: boolean, generateConfig: boolean, generateName: boolean,
+                           callback: (randomName: null | string, constConfig: null | string, constJson: any) => void,
+    ) {
       var lines = config == null ? null : config.trim().split('\n');
       if (lines == null || lines.length <= 0) {
         // return null;
@@ -4535,9 +4643,9 @@ export default Vue.extend({
       var reqCount  = lines.length; //有无效的行  lines.length;  //等待次数
       var respCount = 0;
 
-      randomId             = randomId || 0;
-      var randomNameKeys   = [];
-      var constConfigLines = []; //TODO 改为 [{ "rawPath": "User/id", "replacePath": "User/id@", "replaceValue": "RANDOM_INT(1, 10)", "isExpression": true }] ?
+      randomId                            = randomId || 0;
+      var randomNameKeys: Array<string>   = [];
+      var constConfigLines: Array<string> = []; //TODO 改为 [{ "rawPath": "User/id", "replacePath": "User/id@", "replaceValue": "RANDOM_INT(1, 10)", "isExpression": true }] ?
 
       // alert('< json = ' + JSON.stringify(json, null, '    '))
 
@@ -4586,7 +4694,7 @@ export default Vue.extend({
         // value RANDOM_DB
         const value = line.substring(index + ': '.length);
 
-        var invoke = function (val, which, p_k, pathKeys, key, lastKeyInPath) {
+        var invoke = function (val: any, which: number, p_k: string, pathKeys: Array<string>, key: string, lastKeyInPath: string) {
           try {
             if (generateConfig) {
               var configVal;
@@ -4609,7 +4717,7 @@ export default Vue.extend({
               } else if (typeof val == 'boolean') {
                 valStr = '' + val;
               } else {
-                valStr = new String(val);
+                valStr = String(val);
                 if (valStr.length > 13) {
                   valStr = valStr.substring(0, 5) + '...';
                 }
@@ -4660,7 +4768,14 @@ export default Vue.extend({
         const start = value.indexOf('(');
         const end   = value.lastIndexOf(')');
 
-        var request4Db =  (tableName, which, p_k, pathKeys, key, lastKeyInPath, isRandom, isDesc, step) => {
+        var request4Db = (tableName: null | string | undefined, which: number, p_k: string, pathKeys: Array<string>, key: string, lastKeyInPath: string, isRandom: boolean,
+                          isDesc?: boolean, step?: number,
+        ) => {
+
+          if (tableName == null) {
+            throw new Error('tableName 为null！');
+          }
+
           // const tableName = JSONResponse.getTableName(pathKeys[pathKeys.length - 2]);
           vOutput.value = 'requesting value for ' + tableName + '/' + key + ' from database...';
 
@@ -4668,39 +4783,44 @@ export default Vue.extend({
           const min  = StringUtil.isEmpty(args[0], true) ? null : +args[0];
           const max  = StringUtil.isEmpty(args[1], true) ? null : +args[1];
 
-          const tableReq                 = {
+          const tableReq: IndexedObj     = {
             '@column': lastKeyInPath,
             '@order' : isRandom ? 'rand()' : (lastKeyInPath + (isDesc ? '-' : '+'))
           };
           tableReq[lastKeyInPath + '>='] = min;
           tableReq[lastKeyInPath + '<='] = max;
 
-          const req        = {};
-          const listName   = isRandom ? null : tableName + '-' + lastKeyInPath + '[]';
-          const orderIndex = isRandom ? null : getOrderIndex(randomId, line, null);
+          const req: IndexedObj = {};
+          const listName        = isRandom ? null : tableName + '-' + lastKeyInPath + '[]';
+          const orderIndex      = isRandom ? null : getOrderIndex(randomId, line, null);
 
           if (isRandom) {
             req[tableName] = tableReq;
           } else {
             // 从数据库获取时不考虑边界，不会在越界后自动循环
-            var listReq        = {
+            var listReq: IndexedObj = {
               count: 1, // count <= 100 ? count : 0,
-              page : (step * orderIndex) % 100  //暂时先这样，APIJSON 应该改为 count*page <= 10000  //FIXME 上限 100 怎么破，lastKeyInPath 未必是 id
+              page : ((step as number) * orderIndex) % 100  //暂时先这样，APIJSON 应该改为 count*page <= 10000  //FIXME 上限 100 怎么破，lastKeyInPath 未必是 id
             };
-            listReq[tableName] = tableReq;
-            req[listName]      = listReq;
+            listReq[tableName]      = tableReq;
+
+            if (listName == null) {
+              throw new Error('listName 为null！');
+            }
+
+            req[listName] = listReq;
           }
 
           // reqCount ++;
-          this.request(true, REQUEST_TYPE_JSON, baseUrl + '/get', req, {},  (url, res, err) => {
+          this.request(true, REQUEST_TYPE_JSON, baseUrl + '/get', req, {}, (url, res, err) => {
             // respCount ++;
             try {
-              this.onResponse(url, res, err);
+              this.onResponse(url, res, err as Error);
             } catch (e) {
             }
 
-            var data = (res || {}).data || {};
-            if (data.code != CODE_SUCCESS) {
+            var data: IndexedObj = (res || {}).data || {};
+            if (data.code != globalVars.CODE_SUCCESS) {
               respCount     = -reqCount;
               vOutput.value = '随机测试 为第 ' + (which + 1) + ' 行\n  ' + p_k + '  \n获取数据库数据 异常：\n' + data.msg;
               alert(StringUtil.get(vOutput.value));
@@ -4711,7 +4831,17 @@ export default Vue.extend({
             if (isRandom) {
               invoke((data[tableName] || {})[lastKeyInPath], which, p_k, pathKeys, key, lastKeyInPath);
             } else {
+
+              if (listName == null) {
+                throw new Error('listName 为null！');
+              }
+
               var val = (data[listName] || [])[0];
+
+              if (ORDER_MAP == null) {
+                throw new Error('ORDER_MAP 为null！');
+              }
+
               //越界，重新获取
               if (val == null && orderIndex > 0 && ORDER_MAP[randomId] != null && ORDER_MAP[randomId][line] != null) {
                 ORDER_MAP[randomId][line] = null;  //重置，避免还是在原来基础上叠加
@@ -4778,7 +4908,7 @@ export default Vue.extend({
             toEval = (fun == ORDER_IN ? 'orderIn' : 'orderInt')
                 + '(' + isDesc + ', ' + step * getOrderIndex(
                     randomId, line
-                    , fun == ORDER_INT ? 0 : StringUtil.split(value.substring(start + 1, end)).length
+                    , fun == ORDER_INT ? 0 : (StringUtil.split(value.substring(start + 1, end)) as Array<string>).length
                 ) + ', ' + value.substring(start + 1);
           } else {  //随机函数
             fun = funWithOrder;  //还原，其它函数不支持 升降序和跨步！
@@ -4824,7 +4954,7 @@ export default Vue.extend({
      3-对象缺少字段/整数变小数，黄色；
      4-code/值类型 改变，红色；
      */
-    test: function (isRandom, accountIndex) {
+    test: function (isRandom: boolean, accountIndex: null | number) {
       var accounts       = this.accounts || [];
       // alert('test  accountIndex = ' + accountIndex)
       var isCrossEnabled = this.isCrossEnabled;
@@ -4869,21 +4999,21 @@ export default Vue.extend({
           accounts[this.currentAccountIndex].isLoggedIn = true;
         }
         var index = accountIndex < 0 ? this.currentAccountIndex : accountIndex;
-        this.onClickAccount(index, accounts[index],  (isLoggedIn, index, err) => {
+        this.onClickAccount(index, accounts[index], (isLoggedIn, index, err) => {
           // if (index >= 0 && isLoggedIn == false) {
           //   alert('第 ' + index + ' 个账号登录失败！' + (err == null ? '' : err.message))
           //   this.test(isRandom, accountIndex + 1)
           //   return
           // }
           this.showTestCase(true, false);
-          this.startTest(list, allCount, isRandom, accountIndex);
+          this.startTest(list, allCount, isRandom, accountIndex as number);
         });
       } else {
         this.startTest(list, allCount, isRandom, accountIndex);
       }
     },
 
-    startTest: function (list, allCount, isRandom, accountIndex) {
+    startTest: function (list: Array<any>, allCount: number, isRandom: boolean, accountIndex: number) {
       this.testProcess = '正在测试: ' + 0 + '/' + allCount;
 
       for (var i = 0; i < allCount; i++) {
@@ -4912,19 +5042,21 @@ export default Vue.extend({
         this.request(false, document.type, baseUrl + document.url, this.getRequest(document.request), header, (url, res, err) => {
 
           try {
-            this.onResponse(url, res, err);
+            this.onResponse(url, res, err as Error);
             this.log('test  this.request >> res.data = ' + JSON.stringify(res.data, null, '  '));
           } catch (e) {
             this.log('test  this.request >> } catch (e) {\n' + e.message);
           }
 
-          this.compareResponse(allCount, list, index, item, res.data, isRandom, accountIndex, false, err);
+          this.compareResponse(allCount, list, index, item, res.data, isRandom, accountIndex, false, err as Error);
         });
       }
 
     },
 
-    compareResponse: function (allCount, list, index, item, response, isRandom, accountIndex, justRecoverTest, err) {
+    compareResponse: function (allCount: number, list: null | Array<any>, index: number, item: IndexedObj, response: IndexedObj,
+                               isRandom?: boolean, accountIndex?: number, justRecoverTest?: boolean, err?: null | Error,
+    ) {
       var it = item || {}; //请求异步
       var d  = (isRandom ? this.currentRemoteItem.Document : it.Document) || {}; //请求异步
       var r  = isRandom ? it.Random : null; //请求异步
@@ -4945,7 +5077,9 @@ export default Vue.extend({
       this.onTestResponse(allCount, list, index, it, d, r, tr, response, tr.compare || {}, isRandom, accountIndex, justRecoverTest);
     },
 
-    onTestResponse: function (allCount, list, index, it, d, r, tr, response, cmp, isRandom, accountIndex, justRecoverTest) {
+    onTestResponse: function (allCount: number, list: null | Array<any>, index: number, it: IndexedObj, d: IndexedObj, r: IndexedObj, tr: IndexedObj,
+                              response: unknown, cmp: unknown, isRandom?: boolean, accountIndex?: number, justRecoverTest?: boolean,
+    ) {
       tr         = tr || {};
       tr.compare = cmp;
 
@@ -4992,7 +5126,9 @@ export default Vue.extend({
         it.Document = d;
       }
       it.TestRecord = tr;
-
+      if (list == null) {
+        throw new Error('list 为null！');
+      }
       Vue.set(list, index, it);
 
       if (justRecoverTest) {
@@ -5027,25 +5163,33 @@ export default Vue.extend({
         // alert('onTestResponse  accountIndex = ' + accountIndex)
         //TODO 自动给非 红色 报错的接口跑随机测试
 
+        if (accountIndex === undefined) {
+          throw new Error('accountIndex 为null！');
+        }
         this.test(false, accountIndex + 1);
       }
     },
 
     //更新父级总览数据
-    updateToRandomSummary: function (item, change) {
+    updateToRandomSummary: function (item: null | IndexedObj, change: null | number) {
       var random = item == null || change == null ? null : item.Random;
       var toId   = random == null ? null : random.toId;
       if (toId != null && toId > 0) {
 
         for (var i in this.randoms) {
 
-          var toIt = this.randoms[i];
+          var toIt = this.randoms[i as any];
           if (toIt != null && toIt.Random != null && toIt.Random.id == toId) {
 
             var toRandom = toIt.Random;
             var id       = toRandom == null ? 0 : toRandom.id;
             var count    = id == null || id <= 0 ? 0 : toRandom.count;
             if (count != null && count > 1) {
+
+              if (item == null) {
+                throw new Error('item 为null！');
+              }
+
               var key = item.compareColor + 'Count';
               if (toIt[key] == null) {
                 toIt[key] = 0;
@@ -5076,7 +5220,7 @@ export default Vue.extend({
     /**移除调试字段
      * @param obj
      */
-    removeDebugInfo: function (obj) {
+    removeDebugInfo: function (obj: null | IndexedObj) {
       if (obj != null) {
         delete obj['trace'];
         delete obj['sql:generate|cache|execute|maxExecute'];
@@ -5090,9 +5234,9 @@ export default Vue.extend({
      * @param index
      * @param item
      */
-    downloadTest: function (index, item, isRandom) {
+    downloadTest: function (index: number, item: null | IndexedObj, isRandom?: boolean) {
       item = item || {};
-      var document;
+      var document: IndexedObj;
       if (isRandom) {
         document = this.currentRemoteItem || {};
       } else {
@@ -5114,7 +5258,7 @@ export default Vue.extend({
        * beyond compare会把第一个文件的后面一段与第二个文件匹配，
        * 导致必须先删除第一个文件内的后面与第二个文件重复的一段，再重新对比。
        */
-      setTimeout( () => {
+      setTimeout(() => {
         var tests = this.tests[String(this.currentAccountIndex)] || {};
         saveTextAs(
             '# APIJSON自动化回归测试-后\n主页: https://github.com/Tencent/APIJSON'
@@ -5144,7 +5288,7 @@ export default Vue.extend({
      * @param index
      * @param item
      */
-    handleTest: function (right, index, item, isRandom) {
+    handleTest: function (right: boolean, index: number, item: null | IndexedObj, isRandom?: boolean) {
       item       = item || {};
       var random = item.Random = item.Random || {};
       var document;
@@ -5172,6 +5316,11 @@ export default Vue.extend({
       var isBefore = item.showType == 'before';
       if (right != true) {
         item.showType = isBefore ? 'after' : 'before';
+
+        if (list == null) {
+          throw new Error('list 为null！');
+        }
+
         Vue.set(list, index, item);
 
         var res = isBefore ? JSON.stringify(currentResponse) : testRecord.response;
@@ -5191,16 +5340,19 @@ export default Vue.extend({
           };
 
           this.request(true, REQUEST_TYPE_JSON, url, req, {}, (url, res, err) => {
-            this.onResponse(url, res, err);
+            this.onResponse(url, res, err as Error);
 
             var data = res.data || {};
-            if (data.code != CODE_SUCCESS && testRecord != null && testRecord.id != null) {
+            if (data.code != globalVars.CODE_SUCCESS && testRecord != null && testRecord.id != null) {
               alert('撤回最新的校验标准 异常：\n' + data.msg);
               return;
             }
 
             if (isRandom) {
               this.updateToRandomSummary(item, -1);
+            }
+            if (item == null) {
+              throw new Error('item 为null！');
             }
             item.compareType    = JSONResponse.COMPARE_NO_STANDARD;
             item.compareMessage = '查看结果';
@@ -5225,8 +5377,11 @@ export default Vue.extend({
           delete currentResponse.code; //code必须一致
           delete currentResponse.throw; //throw必须一致
 
-          var isML              = this.isMLEnabled;
-          var stddObj           = isML ? JSONResponse.updateStandard(standard || {}, currentResponse) : {};
+          var isML    = this.isMLEnabled;
+          var stddObj = isML ? JSONResponse.updateStandard(standard || {}, currentResponse) : {};
+          if (stddObj == null) {
+            throw new Error('stddObj 为null！');
+          }
           stddObj.code          = code;
           currentResponse.code  = code;
           stddObj.throw         = thrw;
@@ -5263,11 +5418,11 @@ export default Vue.extend({
           //   }
           // }
 
-          this.request(true, REQUEST_TYPE_JSON, url, req, {},  (url, res, err) => {
-            this.onResponse(url, res, err);
+          this.request(true, REQUEST_TYPE_JSON, url, req, {}, (url, res, err) => {
+            this.onResponse(url, res, err as Error);
 
             var data = res.data || {};
-            if (data.code != CODE_SUCCESS) {
+            if (data.code != globalVars.CODE_SUCCESS) {
               if (isML) {
                 alert('机器学习更新标准 异常：\n' + data.msg);
               }
@@ -5275,7 +5430,9 @@ export default Vue.extend({
               if (isRandom) {
                 this.updateToRandomSummary(item, -1);
               }
-
+              if (item == null) {
+                throw new Error('item 为null！');
+              }
               item.compareType    = JSONResponse.COMPARE_EQUAL;
               item.compareMessage = '查看结果';
               item.compareColor   = 'white';
@@ -5291,13 +5448,13 @@ export default Vue.extend({
               if (isRandom) {
                 var r = req == null ? null : req.Random;
                 if (r != null && (data.Random || {}).id != null) {
-                  r.id        = data.Random.id;
-                  item.Random = r;
+                  (r as IndexedObj).id = data.Random.id;
+                  item.Random          = r;
                 }
                 if ((data.TestRecord || {}).id != null) {
                   testRecord.id = data.TestRecord.id;
                   if (r != null) {
-                    testRecord.randomId = r.id;
+                    testRecord.randomId = (r as IndexedObj).id;
                   }
                 }
               }
@@ -5323,7 +5480,9 @@ export default Vue.extend({
       }
     },
 
-    updateTestRecord: function (allCount, list, index, item, response, isRandom) {
+    updateTestRecord: function (allCount: number, list: null | Array<any>, index: number, item: IndexedObj, response?: IndexedObj, isRandom?: boolean,
+                                unknown_param_1?: unknown, unknown_param_2?: unknown,
+    ) {
       item    = item || {};
       var doc = (isRandom ? item.Random : item.Document) || {};
 
@@ -5338,21 +5497,26 @@ export default Vue.extend({
           '@having'    : this.isMLEnabled ? 'length(standard)>2' : null  // '@having': this.isMLEnabled ? 'json_length(standard)>0' : null
         }
       }, {}, (url, res, err) => {
-        this.onResponse(url, res, err);
+        this.onResponse(url, res, err as Error);
 
         var data = (res || {}).data || {};
-        if (data.code != CODE_SUCCESS) {
+        if (data.code != globalVars.CODE_SUCCESS) {
           alert('获取最新的校验标准 异常：\n' + data.msg);
           return;
         }
 
         item.TestRecord = data.TestRecord;
-        this.compareResponse(allCount, list, index, item, response, isRandom, this.currentAccountIndex, true, err);
+
+        if (response == null) {
+          throw new Error('response 为null！');
+        }
+
+        this.compareResponse(allCount, list, index, item, response, isRandom, this.currentAccountIndex, true, err as Error);
       });
     },
 
     //显示详细信息, :data-hint :data, :hint 都报错，只能这样
-    setRequestHint(index, item, isRandom) {
+    setRequestHint(index: number, item: IndexedObj, isRandom?: boolean) {
       item  = item || {};
       var d = isRandom ? item.Random : item.Document;
       // var r = d == null ? null : (isRandom ? d.config : d.request);
@@ -5360,18 +5524,18 @@ export default Vue.extend({
 
       if (isRandom) {
         var toId = (d == null ? null : d.toId) || 0;
-        this.$refs[toId <= 0 ? 'randomTexts' : 'randomSubTexts'][index].setAttribute('data-hint', (d || {}).config == null ? '' : d.config);
+        (this.$refs as IndexedObj)[toId <= 0 ? 'randomTexts' : 'randomSubTexts'][index].setAttribute('data-hint', (d || {}).config == null ? '' : d.config);
       } else {
-        this.$refs['testCaseTexts'][index].setAttribute('data-hint', JSON.stringify(this.getRequest(d.request), null, ' '));
+        (this.$refs as IndexedObj)['testCaseTexts'][index].setAttribute('data-hint', JSON.stringify(this.getRequest(d.request), null, ' '));
       }
     },
 
     //显示详细信息, :data-hint :data, :hint 都报错，只能这样
-    setTestHint(index, item, isRandom) {
+    setTestHint(index: number, item: IndexedObj, isRandom?: boolean) {
       item     = item || {};
       var toId = isRandom ? ((item.Random || {}).toId || 0) : 0;
       var h    = item.hintMessage;
-      this.$refs[isRandom ? (toId <= 0 ? 'testRandomResultButtons' : 'testRandomSubResultButtons') : 'testResultButtons'][index].setAttribute('data-hint', h || '');
+      (this.$refs as IndexedObj)[isRandom ? (toId <= 0 ? 'testRandomResultButtons' : 'testRandomSubResultButtons') : 'testResultButtons'][index].setAttribute('data-hint', h || '');
     },
 
 // APIJSON >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>

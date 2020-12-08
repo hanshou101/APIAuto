@@ -3,6 +3,7 @@ import Main         from '../main.vue';
 import {JSONObject} from './apijson/JSONObject';
 import {StringUtil} from './apijson/StringUtil';
 import {CodeUtil}   from './apijson/CodeUtil';
+import {globalVars} from './global';
 
 declare const $: JQShortNS.Static$;
 
@@ -95,7 +96,7 @@ Vue.use({
      * @return {boolean}
      */
     Vue.prototype.onRenderJSONItem = function (val, key, path) {
-      if (isSingle || key == null) {
+      if (globalVars.isSingle || key == null) {
         return true;
       }
       if (key == '_$_this_$_') {
@@ -194,7 +195,7 @@ Vue.use({
     Vue.prototype.setResponseHint = function (val, key, $event) {
       console.log('setResponseHint');
       (this.$refs.responseKey as HTMLSpanElement).setAttribute('data-hint',
-        isSingle ? '' : this.getResponseHint(val, key, $event));
+        globalVars.isSingle ? '' : this.getResponseHint(val, key, $event));
     };
     /**获取 Response JSON 的注释
      * 方案一：
@@ -300,13 +301,13 @@ Vue.use({
 
                 var pathUri = (StringUtil.isEmpty(path) ? '' : path + '/') + key;
 
-                var c = CodeUtil.getCommentFromDoc(docObj == null ? null : docObj['[]'], table, column, (App as any).getMethod(), App.database, App.language, true, false, pathUri.split('/'), isRestful, val); // this.getResponseHint({}, table, $event
+                var c = CodeUtil.getCommentFromDoc(globalVars.docObj == null ? null : globalVars.docObj['[]'], table, column, (App as any).getMethod(), App.database, App.language, true, false, pathUri.split('/'), isRestful, val); // this.getResponseHint({}, table, $event
                 s0    = column + (StringUtil.isEmpty(c, true) ? '' : ': ' + c);
               }
 
               var pathUri = (StringUtil.isEmpty(path) ? '' : path + '/') + (StringUtil.isEmpty(column) ? key : column);
 
-              var c = CodeUtil.getCommentFromDoc(docObj == null ? null : docObj['[]'], table, isRestful ? key : null, (App as any).getMethod(), (App as any).database, (App as any).language, true, false, pathUri.split('/'), isRestful, val);
+              var c = CodeUtil.getCommentFromDoc(globalVars.docObj == null ? null : globalVars.docObj['[]'], table, isRestful ? key : null, (App as any).getMethod(), (App as any).database, (App as any).language, true, false, pathUri.split('/'), isRestful, val);
               s     = (StringUtil.isEmpty(path) ? '' : path + '/') + key + ' 中 '
                 + (
                   StringUtil.isEmpty(c, true) ? '' : table + ': '
@@ -328,7 +329,7 @@ Vue.use({
         // alert('setResponseHint  table = ' + table + '; column = ' + column)
 
         var pathUri = (StringUtil.isEmpty(path) ? '' : path + '/') + key;
-        var c       = CodeUtil.getCommentFromDoc(docObj == null ? null : docObj['[]'], table, isRestful ? key : column, method, (App as any).database, (App as any).language, true, false, pathUri.split('/'), isRestful, val);
+        var c       = CodeUtil.getCommentFromDoc(globalVars.docObj == null ? null : globalVars.docObj['[]'], table, isRestful ? key : column, method, (App as any).database, (App as any).language, true, false, pathUri.split('/'), isRestful, val);
 
         s += pathUri + (StringUtil.isEmpty(c, true) ? '' : ': ' + c);
       } catch (e) {
@@ -342,10 +343,6 @@ Vue.use({
 });
 
 //这些全局变量不能放在data中，否则会报undefined错误
-
-var docObj: NullableType<DocObjType>;
-var isSingle = true;
-
 
 // APIJSON >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 

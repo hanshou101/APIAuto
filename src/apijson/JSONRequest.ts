@@ -13,7 +13,8 @@
  limitations under the License.*/
 
 
-import {log} from './api-util';
+import {log}        from './api-util';
+import {globalVars} from '../global';
 
 /**wrapper for request
  * @author Lemon
@@ -21,15 +22,6 @@ import {log} from './api-util';
  */
 
 const TAG_REQUEST_UTIL = 'RequestUtil';
-
-var URL_BASE   = 'http://apijson.cn:8080'; // 基地址
-var URL_GET    = URL_BASE + '/get'; // 常规获取数据方式
-var URL_HEAD   = URL_BASE + '/head'; // 检查，默认是非空检查，返回数据总数
-var URL_GETS   = URL_BASE + '/gets'; // 通过POST来GET数据，不显示请求内容和返回结果，一般用于对安全要求比较高的请求
-var URL_HEADS  = URL_BASE + '/heads'; // 通过POST来HEAD数据，不显示请求内容和返回结果，一般用于对安全要求比较高的请求
-var URL_POST   = URL_BASE + '/post'; // 新增(或者说插入)数据
-var URL_PUT    = URL_BASE + '/put'; // 修改数据，只修改传入字段对应的值
-var URL_DELETE = URL_BASE + '/delete'; // 删除数据
 
 
 type Type_onreadystatechange = XMLHttpRequest['onreadystatechange'];
@@ -56,7 +48,7 @@ function request(url: null | string, json: null | Array<any> | unknown,
 
   var rqf = format(JSON.stringify(json));
 
-  var branch = url.substring(URL_BASE.length + 1, url.length);
+  var branch = url.substring(globalVars.URL_BASE.length + 1, url.length);
   var end    = branch.indexOf('/');
   var method = branch.substring(0, end < 0 ? branch.length : end);
 
@@ -154,7 +146,7 @@ function encode(json: any) {
 /**编码JSON，转义所有String
  * @param data 任意类型
  */
-function toFormData(data: any) {
+export function toFormData(data: any) {
   if (data == null) {
     return null;
   }
@@ -214,7 +206,6 @@ export function format(json: any) {
 }
 
 
-
 /**将json字符串转为JSON对象
  */
 function parseJSON(s?: object | string) {
@@ -260,7 +251,7 @@ function isEmpty(s: null | string) {
 function getObject(table: string, id: number, notAlert: boolean, callBack: Type_onreadystatechange) {
   alertOfDebug('getObject  table = ' + table + '; id = ' + id);
 
-  return request(URL_GET, newSingleJSON(table, {'id': id}, null), notAlert, callBack);
+  return request(globalVars.URL_GET, newSingleJSON(table, {'id': id}, null), notAlert, callBack);
 }
 
 /**获取数组
@@ -275,7 +266,7 @@ function getArray(table: string, json: {}, count: number, page: number, notAlert
   alertOfDebug('getArray  table = ' + table + '; count = ' + count + '; page = ' + page
     + '; json = \n' + format(json));
 
-  return request(URL_GET, newArrayJSON(table, json, count, page), notAlert, callBack);
+  return request(globalVars.URL_GET, newArrayJSON(table, json, count, page), notAlert, callBack);
 }
 
 /**新增单个对象
@@ -293,7 +284,7 @@ function postObject(table: string, json: IndexedObj, notAlert: boolean, callBack
     return;
   }
 
-  return request(URL_POST, newSingleJSON(table, json, table), notAlert, callBack);
+  return request(globalVars.URL_POST, newSingleJSON(table, json, table), notAlert, callBack);
 }
 
 /**修改单个对象
@@ -314,7 +305,7 @@ function putObject(table: string, json: IndexedObj, notAlert: boolean, callBack:
     return;
   }
 
-  return request(URL_PUT, newSingleJSON(table, json, table), notAlert, callBack);
+  return request(globalVars.URL_PUT, newSingleJSON(table, json, table), notAlert, callBack);
 }
 
 /**删除单个对象
@@ -330,7 +321,7 @@ function deleteObject(table: string, id: number, notAlert: boolean, callBack: Ty
     return;
   }
 
-  return request(URL_DELETE, newSingleJSON(table, {'id': id}, table), notAlert, callBack);
+  return request(globalVars.URL_DELETE, newSingleJSON(table, {'id': id}, table), notAlert, callBack);
 }
 
 /**修改多个对象
@@ -349,7 +340,7 @@ function putArray(table: string, json: IndexedObj, notAlert: boolean, callBack: 
     return;
   }
 
-  return request(URL_PUT, newSingleJSON(table, json, table + '[]'), notAlert, callBack);
+  return request(globalVars.URL_PUT, newSingleJSON(table, json, table + '[]'), notAlert, callBack);
 }
 
 /**删除多个对象
@@ -366,7 +357,7 @@ function deleteArray(table: string, idArray: Array<number>, notAlert: boolean, c
     return;
   }
 
-  return request(URL_DELETE, newSingleJSON(table, {'id{}': idArray}, table + '[]'), notAlert, callBack);
+  return request(globalVars.URL_DELETE, newSingleJSON(table, {'id{}': idArray}, table + '[]'), notAlert, callBack);
 }
 
 

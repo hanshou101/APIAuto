@@ -16,6 +16,7 @@
 import {JSONObject} from './JSONObject';
 import {StringUtil} from './StringUtil';
 import {log}        from './api-util';
+import {globalVars} from '../global';
 
 /**parser for json response
  * @author Lemon
@@ -23,33 +24,6 @@ import {log}        from './api-util';
 
 
 //状态信息，非GET请求获得的信息<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-const CODE_SUCCESS               = 200; //成功
-const CODE_UNSUPPORTED_ENCODING  = 400; //编码错误
-const CODE_ILLEGAL_ACCESS        = 401; //权限错误
-const CODE_UNSUPPORTED_OPERATION = 403; //禁止操作
-const CODE_NOT_FOUND             = 404; //未找到
-const CODE_ILLEGAL_ARGUMENT      = 406; //参数错误
-const CODE_NOT_LOGGED_IN         = 407; //未登录
-const CODE_TIME_OUT              = 408; //超时
-const CODE_CONFLICT              = 409; //重复，已存在
-const CODE_CONDITION_ERROR       = 412; //条件错误，如密码错误
-const CODE_UNSUPPORTED_TYPE      = 415; //类型错误
-const CODE_OUT_OF_RANGE          = 416; //超出范围
-const CODE_NULL_POINTER          = 417; //对象为空
-const CODE_SERVER_ERROR          = 500; //服务器内部错误
-
-
-const MSG_SUCCEED      = 'success'; //成功
-const MSG_SERVER_ERROR = 'Internal Server Error!'; //服务器内部错误
-
-
-const KEY_CODE  = 'code';
-const KEY_MSG   = 'msg';
-const KEY_ID    = 'id';
-const KEY_ID_IN = KEY_ID + '{}';
-const KEY_COUNT = 'count';
-const KEY_TOTAL = 'total';
 
 
 // function log(tag: string, msg: string) {
@@ -64,7 +38,7 @@ var JSONResponse = {
    * @return
    */
   isSuccess: function (code: number) {
-    return code == CODE_SUCCESS;
+    return code == globalVars.CODE_SUCCESS;
   },
 
   /**校验服务端是否存在table
@@ -346,11 +320,11 @@ var JSONResponse = {
    */
   compareResponse: function (target: IndexedObj, real: IndexedObj,
                              folder: null | string, isMachineLearning: boolean,
-                             codeName: string, exceptKeys: Array<string>,
+                             __codeName?: string, exceptKeys?: Array<string>,
   ) {
-    codeName  = StringUtil.isEmpty(codeName, true) ? 'code' : codeName;
-    var tCode = (target || {})[codeName];
-    var rCode = (real || {})[codeName];
+    const codeName: string = StringUtil.isEmpty(__codeName, true) ? 'code' : __codeName as string;
+    var tCode              = (target || {})[codeName];
+    var rCode              = (real || {})[codeName];
 
     //解决了弹窗提示机器学习更新标准异常，但导致所有项测试结果都变成状态码 code 改变
     // if (real == null) {
@@ -418,7 +392,7 @@ var JSONResponse = {
    4-类型/code 改变，红色；
    */
   compareWithBefore: function (target: null | Array<any> | IndexedObj, real: IndexedObj,
-                               folder: null | string, exceptKeys: Array<string>) {
+                               folder: null | string, exceptKeys?: Array<string>) {
     folder = folder == null ? '' : folder;
 
     if (target == null) {
@@ -579,7 +553,7 @@ var JSONResponse = {
    3-缺少字段/整数变小数，黄色；
    4-类型/code 改变，红色；
    */
-  compareWithStandard: function (target: null | IndexedObj, real: null | IndexedObj, folder: null | string, exceptKeys: Array<string>) {
+  compareWithStandard: function (target: null | IndexedObj, real: null | IndexedObj, folder: null | string, exceptKeys?: Array<string>) {
     folder = folder == null ? '' : folder;
 
     if (target == null) {
@@ -801,7 +775,7 @@ var JSONResponse = {
 
   /**更新测试标准，通过原来的标准与最新的数据合并来实现
    */
-  updateStandard: function (target: null | Array<any> | IndexedObj, real: null | IndexedObj, exceptKeys: Array<string>) {
+  updateStandard: function (target: null | Array<any> | IndexedObj, real: null | IndexedObj, exceptKeys?: Array<string>) {
     if (target instanceof Array) { // JSONArray
       throw new Error('Standard 语法错误，不应该有 array！');
     }

@@ -64,7 +64,7 @@ var CodeUtil = {
   database        : 'MYSQL',
   schema          : 'sys',
   language        : 'Kotlin',
-  tableList       : [],
+  tableList       : [] as NullableType<Array<any>>,
   thirdParty      : 'YAPI',
   thirdPartyApiMap: {} as IndexedObj,
 
@@ -76,7 +76,10 @@ var CodeUtil = {
    * @param language
    * @return parseComment
    */
-  parseComment: function (reqStr: string, tableList: Array<any>, method: null | string, database: string, language: string, isReq: boolean) { //怎么都获取不到真正的长度，cols不行，默认20不变，maxLineLength不行，默认undefined不变 , maxLineLength) {
+  parseComment: function (reqStr: string, tableList: null | Array<any>, method: null | string,
+                          database: string, language: string, isReq: string,
+                          unknown_param?: unknown,
+  ) { //怎么都获取不到真正的长度，cols不行，默认20不变，maxLineLength不行，默认undefined不变 , maxLineLength) {
     if (StringUtil.isEmpty(reqStr)) {
       return '';
     }
@@ -433,7 +436,7 @@ var CodeUtil = {
    * @param depth
    * @return parseCode
    */
-  parseSwiftRequest: function (name: null | string, reqObj: TypeNS.ValueType, __depth: number): string {
+  parseSwiftRequest: function (name: null | string, reqObj: TypeNS.ValueType, __depth?: number): string {
     var depth: number;
     if (__depth == null || __depth < 0) {
       depth = 0;
@@ -611,7 +614,7 @@ var CodeUtil = {
    * @param depth
    * @return parseCode
    */
-  parseObjectiveCRequest: function (name: null | string, reqObj: TypeNS.ValueType, depth: number) {
+  parseObjectiveCRequest: function (name: null | string, reqObj: TypeNS.ValueType, depth?: number) {
     return CodeUtil.parseSwiftRequest(name, reqObj, depth);
   },
 
@@ -624,7 +627,8 @@ var CodeUtil = {
    * @return isSmart 是否智能
    */
   parseKotlinRequest: function (
-    name: null | string, reqObj: TypeNS.ValueType, depth: number, isSmart: boolean, isArrayItem: boolean, useVar4Value: boolean, type: string, host: null | string, url: null | string, comment: null | string, isRESTful: boolean
+    name: null | string, reqObj: TypeNS.ValueType, depth: number, isSmart: boolean, isArrayItem: boolean, useVar4Value: boolean, type: string, host: null | string, url: null | string, comment: null | string,
+    isRESTful?: boolean,
   ): string {
     if (depth == null || depth < 0) {
       depth = 0;
@@ -656,7 +660,7 @@ var CodeUtil = {
       var modelName = StringUtil.firstCase(varName, true);
 
       if (StringUtil.isEmpty(modelName, true) != true) {
-        var useStaticClass = type == 'JSON' && !isSmart;
+        const useStaticClass: boolean = (type == 'JSON') && !isSmart;
 
         var nextNextNextPadding     = CodeUtil.getBlank(depth + 3);
         var nextNextNextNextPadding = CodeUtil.getBlank(depth + 4);
@@ -880,7 +884,7 @@ var CodeUtil = {
       //RESTful 等非 APIJSON 规范的 API >>>>>>>>>>>>>>>>>>>>>>>>>>
     }
 
-    var useStaticClass = isRESTful && type == 'JSON' && isSmart != true && StringUtil.isEmpty(name, true) != true;
+    const useStaticClass: boolean = (!!isRESTful) && (type == 'JSON') && (isSmart != true) && (StringUtil.isEmpty(name, true) != true);
 
     if (name == null) {
       throw new Error('name是null！');
@@ -990,7 +994,7 @@ var CodeUtil = {
    * @return isSmart 是否智能
    */
   parseJavaRequest: function (
-    name: string, reqObj: TypeNS.ValueType, depth: number, isSmart: boolean, isArrayItem?: boolean, useVar4Value?: boolean, type?: string, url?: string, comment?: string
+    name: null | string, reqObj: TypeNS.ValueType, depth: number, isSmart: boolean, isArrayItem?: boolean, useVar4Value?: boolean, type?: string, url?: string, comment?: string
   ): string {
     name = name || 'request';
     if (depth == null || depth < 0) {
@@ -2043,7 +2047,7 @@ var CodeUtil = {
    * @param isSmart
    * @return parseCode
    */
-  parseGoResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isSmart: boolean) {
+  parseGoResponse: function (__name: string, resObj: TypeNS.ValueType, depth: number, isSmart?: boolean) {
     if (depth == null || depth < 0) {
       depth = 0;
     }
@@ -5962,7 +5966,7 @@ var CodeUtil = {
    * @param database
    */
   getComment4Request: function (tableList: Array<any> | null, name: string, key: string, value: TypeNS.ValueType, method: string,
-                                isInSubquery: boolean, database: string, language: string, isReq: boolean, names: null | Array<any>, isRestful: boolean,
+                                isInSubquery: boolean, database: string, language: string, isReq: string, names: null | Array<any>, isRestful: boolean,
   ) {
     // alert('name = ' + name + '; key = ' + key + '; value = ' + value + '; method = ' + method);
 
@@ -6219,7 +6223,7 @@ var CodeUtil = {
    */
   getCommentFromDoc: function (
     tableList: null | Array<any>, tableName: string, columnName: null | string, method: string, database: string, language: string,
-    onlyTableAndColumn?: boolean, isReq?: boolean, pathKeys?: null | Array<string>, isRestful?: boolean, value?: any
+    onlyTableAndColumn?: boolean, isReq?: string, pathKeys?: null | Array<string>, isRestful?: boolean, value?: any
   ): string {
     log('getCommentFromDoc  tableName = ' + tableName + '; columnName = ' + columnName
       + '; method = ' + method + '; database = ' + database + '; language = ' + language
