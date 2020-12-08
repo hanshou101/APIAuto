@@ -1,12 +1,14 @@
 import {JSONObject} from '../../src/apijson/JSONObject';
 import {StringUtil} from '../../src/apijson/StringUtil';
 import {CodeUtil}   from '../../src/apijson/CodeUtil';
+import {globalVars} from '../../src/global';
 
 
 declare global {
   // const JSONObject = JSONObject;
   // const StringUtil = StringUtil;
   // const CodeUtil   = CodeUtil;
+
 
   interface DocObjType {
     '[]': Array<any>;
@@ -17,6 +19,7 @@ declare global {
 
   interface Window {
     // StringUtil: StringUtil;
+    globalVars: typeof globalVars;
   }
 
   namespace ThirdParty {

@@ -24,7 +24,7 @@ var JSONObject = {
   /**判断key是否为表名
    * @return
    */
-  isTableKey: function (key?: null | string, value?: object, isRestful?: boolean) {
+  isTableKey: function (key?: null | string, value?: null|object, isRestful?: boolean) {
     log(this.TAG, 'isTableKey  typeof key = ' + (typeof key));
     if (key == null) {
       return false;

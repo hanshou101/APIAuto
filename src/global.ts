@@ -46,3 +46,6 @@ export const globalVars = function () {
 
   };
 }();
+
+
+window.globalVars= globalVars;

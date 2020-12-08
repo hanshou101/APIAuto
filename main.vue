@@ -1,5 +1,5 @@
 <template>
-  <div id="app" style="background-color: white">
+  <div>
     <div class="side-top">
 
       <img src="img/logo.png" class="logo-img"/>
@@ -524,7 +524,7 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
 
                     <div class="form-group" v-show="loginType == 'login'">
                       <label>
-                        <input id="vRemember" type="checkbox" name="remember" @change="setRememberLogin(vRemember.checked)"/> 记住登录
+                        <input id="vRemember" type="checkbox" name="remember" @change="setRememberLogin(DOMS.vRemember.checked)"/> 记住登录
                       </label>
                     </div>
 
@@ -550,21 +550,33 @@ User/id: RANDOM_INT(82001, 82020)  // 随机整数
     </div>
 
     <!-- 登录 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> -->
-
-
   </div>
 </template>
 
+
 <script lang="ts">
-import {log}                from 'src/apijson/api-util';
-import {format, toFormData} from 'src/apijson/JSONRequest';
+
+import {log}                from './src/apijson/api-util';
+import {format, toFormData} from './src/apijson/JSONRequest';
 import Vue                  from 'vue';
 import {StringUtil}         from './src/apijson/StringUtil';
 import {CodeUtil}           from './src/apijson/CodeUtil';
 import {JSONResponse}       from './src/apijson/JSONResponse';
 import {globalVars}         from './src/global';
 
+//
+//—————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+//
+
+
+//
+//—————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+//
+
 const saveTextAs: (content: string, filename: string) => void = (window as any).saveTextAs;
+
+/*
+
 const vInput: HTMLInputElement                                = (window as any).vInput;
 const vHeader: HTMLInputElement                               = (window as any).vHeader;
 const vRandom: HTMLInputElement                               = (window as any).vRandom;
@@ -579,6 +591,8 @@ const vSend: HTMLInputElement                                 = (window as any).
 const onScrollChanged: Function                               = (window as any).onScrollChanged;
 const onURLScrollChanged: Function                            = (window as any).onURLScrollChanged;
 const markdownToHTML: Function                                = (window as any).markdownToHTML;
+
+*/
 
 //
 const localforage: {
@@ -608,6 +622,9 @@ const axios: {
 const Helper: {
   alert(msg: string, type: string): void;
 } = (window as any).Helper;
+const editormd: {
+  markdownToHTML(id: string, cfg: any): void;
+} = (window as any).editormd;
 
 
 var initJson = {};
@@ -881,8 +898,43 @@ export default Vue.extend({
       //
       StringUtil,
       isSyncing     : false,
-      vRemember,
+      // vRemember,
       isDeleteRandom: false as UndefinedAbleType<boolean>,
+
+      DOMS: {
+        //TODO 保留，用v-model绑定到App.data会报错，各种undefined
+        vUrl            : null as any as HTMLInputElement,
+        vUrlComment     : null as any as HTMLInputElement,
+        vTransfer       : null as any as HTMLInputElement,
+        vType           : null as any as HTMLInputElement,
+        vSend           : null as any as HTMLInputElement,
+        //
+        vInput          : null as any as HTMLInputElement,
+        vComment        : null as any as HTMLInputElement,
+        vHeader         : null as any as HTMLInputElement,
+        vRandom         : null as any as HTMLInputElement,
+        vOutput         : null as any as HTMLInputElement,
+        //
+        vAccount        : null as any as HTMLInputElement,
+        vPassword       : null as any as HTMLInputElement,
+        vVerify         : null as any as HTMLInputElement,
+        vRemember       : null as any as HTMLInputElement,
+        //
+        vMarkdown       : null as any as HTMLInputElement,
+        vPage           : null as any as HTMLInputElement,
+        vCount          : null as any as HTMLInputElement,
+        vSearch         : null as any as HTMLInputElement,
+        vTestCasePage   : null as any as HTMLInputElement,
+        vTestCaseCount  : null as any as HTMLInputElement,
+        vTestCaseSearch : null as any as HTMLInputElement,
+        vRandomPage     : null as any as HTMLInputElement,
+        vRandomCount    : null as any as HTMLInputElement,
+        vRandomSearch   : null as any as HTMLInputElement,
+        vRandomSubPage  : null as any as HTMLInputElement,
+        vRandomSubCount : null as any as HTMLInputElement,
+        vRandomSubSearch: null as any as HTMLInputElement,
+
+      },
     };
   },
   computed  : {
@@ -902,7 +954,15 @@ export default Vue.extend({
       this.showJsonView();
     }
   },
-  created() {
+
+  // 为正确取到DOM，需要在 mounted 之后，进行dom获取。
+  mounted() {
+
+    // 此处，绑定jQuery的Doms。
+    this.bindDoms();
+
+    //
+
     try { //可能URL_BASE是const类型，不允许改，这里是初始化，不能出错
       var url = this.getCache('', 'URL_BASE');
       if (StringUtil.isEmpty(url, true) == false) {
@@ -981,6 +1041,7 @@ export default Vue.extend({
     //无效，只能在index里设置 vUrl.value = this.getCache('', 'URL_BASE')
     this.listHistory();
     this.transfer();
+
 
   },
   mounted() {
@@ -1112,16 +1173,16 @@ export default Vue.extend({
         if (isAdminOperation != true) {
           baseUrl = this.getBaseUrl();
         }
-        vUrl.value = (isAdminOperation ? this.server : baseUrl) + branchUrl;
+        this.DOMS.vUrl.value = (isAdminOperation ? this.server : baseUrl) + branchUrl;
       } else {  //隐藏(固定)URL Host
         if (isAdminOperation) {
           this.host = this.server;
         }
-        vUrl.value = branchUrl;
+        this.DOMS.vUrl.value = branchUrl;
       }
 
-      vUrlComment.value = globalVars.isSingle || StringUtil.isEmpty(this.urlComment, true)
-          ? '' : vUrl.value + CodeUtil.getComment(this.urlComment, false, '  ')
+      this.DOMS.vUrlComment.value = globalVars.isSingle || StringUtil.isEmpty(this.urlComment, true)
+          ? '' : this.DOMS.vUrl.value + CodeUtil.getComment(this.urlComment, false, '  ')
           + ' - ' + (this.requestVersion > 0 ? 'V' + this.requestVersion : 'V*');
     },
 
@@ -1147,12 +1208,12 @@ export default Vue.extend({
       }
     },
     getUrl          : function () {
-      var url = StringUtil.get(this.host) + new String(vUrl.value);
+      var url = StringUtil.get(this.host) + String(this.DOMS.vUrl.value);
       return url.replace(/ /g, '');
     },
     //获取基地址
     getBaseUrl      : function () {
-      var url    = new String(vUrl.value).trim();
+      var url    = String(this.DOMS.vUrl.value).trim();
       var length = this.getBaseUrlLength(url);
       url        = length <= 0 ? '' : url.substring(0, length);
       return url == '' ? globalVars.URL_BASE : url;
@@ -1170,7 +1231,7 @@ export default Vue.extend({
     },
     //获取操作方法
     getMethod       : function () {
-      var url   = new String(vUrl.value).trim();
+      var url   = String(this.DOMS.vUrl.value).trim();
       var index = this.getBaseUrlLength(url);
       url       = index <= 0 ? url : url.substring(index);
       return url.startsWith('/') ? url.substring(1) : url;
@@ -1179,7 +1240,7 @@ export default Vue.extend({
     getTag          : function () {
       var req: (IndexedObj | undefined | null) = null;
       try {
-        req = this.getRequest(vInput.value);
+        req = this.getRequest(this.DOMS.vInput.value);
       } catch (e) {
         log('main.getTag', 'try { req = this.getRequest(vInput.value); \n } catch (e) {\n' + e.message);
       }
@@ -1407,7 +1468,7 @@ export default Vue.extend({
             break;
           case 3:
             this.host = this.getBaseUrl();
-            this.showUrl(false, new String(vUrl.value).substring(this.host.length)); //没必要导致必须重新获取 Response，this.onChange(false)
+            this.showUrl(false, String(this.DOMS.vUrl.value).substring(this.host.length)); //没必要导致必须重新获取 Response，this.onChange(false)
             break;
           case 4:
             this.isHeaderShow = show;
@@ -1423,10 +1484,10 @@ export default Vue.extend({
             break;
         }
       } else if (index == 3) {
-        var host   = StringUtil.get(this.host);
-        var branch = String(vUrl.value);
-        this.host  = '';
-        vUrl.value = host + branch; //保证 showUrl 里拿到的 baseUrl = this.host (http://apijson.cn:8080/put /balance)
+        var host             = StringUtil.get(this.host);
+        var branch           = String(this.DOMS.vUrl.value);
+        this.host            = '';
+        this.DOMS.vUrl.value = host + branch; //保证 showUrl 里拿到的 baseUrl = this.host (http://apijson.cn:8080/put /balance)
         this.setBaseUrl(); //保证自动化测试等拿到的 baseUrl 是最新的
         this.showUrl(false, branch); //没必要导致必须重新获取 Response，this.onChange(false)
       } else if (index == 4) {
@@ -1537,8 +1598,8 @@ export default Vue.extend({
         url     : '/' + this.getMethod(),
         request : inputted,
         response: this.jsoncon,
-        header  : vHeader.value,
-        random  : vRandom.value
+        header  : this.DOMS.vHeader.value,
+        random  : this.DOMS.vRandom.value
       };
       var key                = String(Date.now());
       localforage.setItem(key, val, (err, value) => {
@@ -1587,7 +1648,7 @@ export default Vue.extend({
       var random               = (item || {}).Random || {};
       this.randomTestTitle     = random.name;
       this.testRandomCount     = random.count;
-      vRandom.value            = StringUtil.get(random.config);
+      this.DOMS.vRandom.value  = StringUtil.get(random.config);
 
       var response = ((item || {}).TestRecord || {}).response;
       if (StringUtil.isEmpty(response, true) == false) {
@@ -1619,9 +1680,9 @@ export default Vue.extend({
       this.showUrl(false, branch);
 
       this.showTestCase(false, this.isLocalShow);
-      vInput.value  = StringUtil.get(item.request);
-      vHeader.value = StringUtil.get(item.header);
-      vRandom.value = StringUtil.get(item.random);
+      this.DOMS.vInput.value  = StringUtil.get(item.request);
+      this.DOMS.vHeader.value = StringUtil.get(item.header);
+      this.DOMS.vRandom.value = StringUtil.get(item.random);
       this.onChange(false);
 
       if (isRemote) {
@@ -1758,9 +1819,9 @@ export default Vue.extend({
           }
 
           saveTextAs('# ' + this.exTxt.name + '\n主页: https://github.com/Tencent/APIJSON'
-              + '\n\n\nURL: ' + StringUtil.get(vUrl.value)
-              + '\n\n\nHeader:\n' + StringUtil.get(vHeader.value)
-              + '\n\n\nRequest:\n' + StringUtil.get(vInput.value)
+              + '\n\n\nURL: ' + StringUtil.get(this.DOMS.vUrl.value)
+              + '\n\n\nHeader:\n' + StringUtil.get(this.DOMS.vHeader.value)
+              + '\n\n\nRequest:\n' + StringUtil.get(this.DOMS.vInput.value)
               + '\n\n\nResponse:\n' + StringUtil.get(this.jsoncon)
               + '\n\n\n## 解析 Response 的代码' + s
               , this.exTxt.name + '.txt');
@@ -1808,7 +1869,7 @@ export default Vue.extend({
             documentId: did,
             count     : this.requestCount,
             name      : this.exTxt.name,
-            config    : vRandom.value
+            config    : this.DOMS.vRandom.value
           },
           'TestRecord': {
             'response': JSON.stringify(currentResponse),
@@ -1823,7 +1884,7 @@ export default Vue.extend({
             'type'         : this.type,
             'url'          : '/' + this.getMethod(),
             'request'      : this.toDoubleJSON(inputted),
-            'header'       : vHeader.value
+            'header'       : this.DOMS.vHeader.value
           },
           'TestRecord': {
             'randomId'     : 0,
@@ -1852,7 +1913,7 @@ export default Vue.extend({
 
 
               //自动生成随机配置（遍历 JSON，对所有可变值生成配置，排除 @key, key@, key() 等固定值）
-              var req    = this.getRequest(vInput.value, {});
+              var req    = this.getRequest(this.DOMS.vInput.value, {});
               var config = StringUtil.trim(this.newRandomConfig(null, '', req));
               if (config == '') {
                 return;
@@ -1877,7 +1938,7 @@ export default Vue.extend({
                   this.isRandomListShow = true;
                 } else {
                   alert('已自动生成，但上传以下随机配置失败:\n' + config);
-                  vRandom.value = config;
+                  this.DOMS.vRandom.value = config;
                 }
                 this.onResponse(url, res, err as Error);
               });
@@ -2059,6 +2120,7 @@ export default Vue.extend({
               // FIXME 这里，是不是有点问题？？？？？？
               // FIXME 这里，是不是有点问题？？？？？？
               // FIXME 这里，是不是有点问题？？？？？？
+              // var thirdParty = this.getCache('', 'thirdParty');       // FIXME 这句是我根据原语义，猜测的。
 
               this.thirdParty = thirdParty;
               this.saveCache('', 'thirdParty', this.thirdParty);
@@ -2750,7 +2812,7 @@ export default Vue.extend({
       this.isTestCaseShow = show;
       this.isLocalShow    = isLocal;
 
-      vOutput.value = show ? '' : (output || '');
+      this.DOMS.vOutput.value = show ? '' : (output || '');
       this.showDoc();
 
       if (isLocal) {
@@ -2816,10 +2878,10 @@ export default Vue.extend({
           var rpObj = res.data;
 
           if (rpObj != null && rpObj.code === globalVars.CODE_SUCCESS) {
-            this.isTestCaseShow = true;
-            this.isLocalShow    = false;
-            this.testCases      = this.remotes = rpObj['[]'];
-            vOutput.value       = show ? '' : (output || '');
+            this.isTestCaseShow     = true;
+            this.isLocalShow        = false;
+            this.testCases          = this.remotes = rpObj['[]'];
+            this.DOMS.vOutput.value = show ? '' : (output || '');
             this.showDoc();
 
             //this.onChange(false)
@@ -2837,7 +2899,7 @@ export default Vue.extend({
         this.randomSubs = [];
       }
 
-      vOutput.value = show ? '' : (output || '');
+      this.DOMS.vOutput.value = show ? '' : (output || '');
       this.showDoc();
 
       this.randoms = this.randoms || [];
@@ -2904,7 +2966,7 @@ export default Vue.extend({
               this.randoms = rpObj['[]'];
             }
 
-            vOutput.value = show ? '' : (output || '');
+            this.DOMS.vOutput.value = show ? '' : (output || '');
             this.showDoc();
 
             //this.onChange(false)
@@ -2981,7 +3043,7 @@ export default Vue.extend({
     },
 
     setRememberLogin(remember?: boolean) {
-      vRemember.checked = remember || false;
+      this.DOMS.vRemember.checked = remember || false;
     },
 
     getCurrentAccount  : function () {
@@ -3002,7 +3064,7 @@ export default Vue.extend({
         phone   : this.account,
         password: this.password,
         version : 1, // 全局默认版本号，非必须
-        remember: vRemember.checked,
+        remember: this.DOMS.vRemember.checked,
         format  : false,
         defaults: {
           '@database': this.database,
@@ -3051,7 +3113,7 @@ export default Vue.extend({
             if (item != null && req.phone == item.phone) {
               alert(req.phone + ' 已在测试账号中！');
               // this.currentAccountIndex = i
-              item.remember = vRemember.checked;
+              item.remember = this.DOMS.vRemember.checked;
               this.onClickAccount(i, item);
               return;
             }
@@ -3060,8 +3122,8 @@ export default Vue.extend({
 
         this.showUrl(isAdminOperation, '/login');
 
-        vInput.value = JSON.stringify(req, null, '    ');
-        this.type    = REQUEST_TYPE_JSON;
+        this.DOMS.vInput.value = JSON.stringify(req, null, '    ');
+        this.type              = REQUEST_TYPE_JSON;
         this.showTestCase(false, this.isLocalShow);
         this.onChange(false);
         this.send(isAdminOperation, (url, res, err) => {
@@ -3103,7 +3165,7 @@ export default Vue.extend({
      */
     register: function (isAdminOperation: boolean | undefined) {
       this.showUrl(isAdminOperation, '/register');
-      vInput.value = JSON.stringify(
+      this.DOMS.vInput.value = JSON.stringify(
           {
             Privacy: {
               phone    : this.account,
@@ -3112,7 +3174,7 @@ export default Vue.extend({
             User   : {
               name: 'APIJSONUser'
             },
-            verify : vVerify.value
+            verify : this.DOMS.vVerify.value
           },
           null, '    ');
       this.showTestCase(false, false);
@@ -3137,9 +3199,9 @@ export default Vue.extend({
      */
     resetPassword: function (isAdminOperation: boolean | undefined) {
       this.showUrl(isAdminOperation, '/put/password');
-      vInput.value = JSON.stringify(
+      this.DOMS.vInput.value = JSON.stringify(
           {
-            verify : vVerify.value,
+            verify : this.DOMS.vVerify.value,
             Privacy: {
               phone    : this.account,
               _password: this.password
@@ -3190,8 +3252,8 @@ export default Vue.extend({
         });
       } else {
         this.showUrl(isAdminOperation, '/logout');
-        vInput.value = JSON.stringify(req, null, '    ');
-        this.type    = REQUEST_TYPE_JSON;
+        this.DOMS.vInput.value = JSON.stringify(req, null, '    ');
+        this.type              = REQUEST_TYPE_JSON;
         this.showTestCase(false, this.isLocalShow);
         this.onChange(false);
         this.send(isAdminOperation, callback);
@@ -3202,8 +3264,8 @@ export default Vue.extend({
      */
     getVerify: function (isAdminOperation: boolean) {
       this.showUrl(isAdminOperation, '/post/verify');
-      var type     = this.loginType == 'login' ? 0 : (this.loginType == 'register' ? 1 : 2);
-      vInput.value = JSON.stringify(
+      var type               = this.loginType == 'login' ? 0 : (this.loginType == 'register' ? 1 : 2);
+      this.DOMS.vInput.value = JSON.stringify(
           {
             type : type,
             phone: this.account
@@ -3218,7 +3280,7 @@ export default Vue.extend({
         var obj    = data.code == globalVars.CODE_SUCCESS ? data.verify : null;
         var verify = obj == null ? null : obj.verify;
         if (verify != null) { //FIXME isEmpty校验时居然在verify=null! StringUtil.isEmpty(verify, true) == false) {
-          vVerify.value = verify;
+          this.DOMS.vVerify.value = verify;
         }
       });
     },
@@ -3239,18 +3301,18 @@ export default Vue.extend({
         return;
       }
 
-      this.view         = 'output';
-      vComment.value    = '';
-      vUrlComment.value = '';
-      vOutput.value     = 'resolving...';
+      this.view                   = 'output';
+      this.DOMS.vComment.value    = '';
+      this.DOMS.vUrlComment.value = '';
+      this.DOMS.vOutput.value     = 'resolving...';
 
       //格式化输入代码
       try {
         try {
-          this.header = this.getHeader(vHeader.value);
+          this.header = this.getHeader(this.DOMS.vHeader.value);
         } catch (e2) {
           this.isHeaderShow = true;
-          vHeader.select();
+          this.DOMS.vHeader.select();
           throw new Error(e2.message);
         }
 
@@ -3294,11 +3356,11 @@ export default Vue.extend({
           }
         }
 
-        vInput.value   = StringUtil.trim(before)
+        this.DOMS.vInput.value   = StringUtil.trim(before)
             + '\n                                                                                                       '
             + '                                                                                                       \n';  //解决遮挡
-        vSend.disabled = false;
-        vOutput.value  = output = 'OK，请点击 [发送请求] 按钮来测试。[点击这里查看视频教程](http://i.youku.com/apijson)' + code;
+        this.DOMS.vSend.disabled = false;
+        this.DOMS.vOutput.value  = output = 'OK，请点击 [发送请求] 按钮来测试。[点击这里查看视频教程](http://i.youku.com/apijson)' + code;
 
 
         this.showDoc();
@@ -3316,19 +3378,19 @@ export default Vue.extend({
               c += ' ! 非开放请求必须设置 tag ！例如 "tag": "User"';
             }
           }
-          vComment.value    = c;
-          vUrlComment.value = globalVars.isSingle || StringUtil.isEmpty(this.urlComment, true)
-              ? '' : vUrl.value + CodeUtil.getComment(this.urlComment, false, '  ')
+          this.DOMS.vComment.value    = c;
+          this.DOMS.vUrlComment.value = globalVars.isSingle || StringUtil.isEmpty(this.urlComment, true)
+              ? '' : this.DOMS.vUrl.value + CodeUtil.getComment(this.urlComment, false, '  ')
               + ' - ' + (this.requestVersion > 0 ? 'V' + this.requestVersion : 'V*');
 
-          onScrollChanged();
-          onURLScrollChanged();
+          this.onScrollChanged();
+          this.onURLScrollChanged();
         } catch (e) {
           log('onHandle   try { vComment.value = CodeUtil.parseComment >> } catch (e) {\n' + e.message);
         }
       } catch (e) {
         log(e);
-        vSend.disabled = true;
+        this.DOMS.vSend.disabled = true;
 
         this.view  = 'error';
         this.error = {
@@ -3342,9 +3404,9 @@ export default Vue.extend({
      */
     onChange: function (delay: boolean) {
       this.setBaseUrl();
-      inputted          = String(vInput.value);
-      vComment.value    = '';
-      vUrlComment.value = '';
+      inputted                    = String(this.DOMS.vInput.value);
+      this.DOMS.vComment.value    = '';
+      this.DOMS.vUrlComment.value = '';
 
       clearTimeout(handler);
 
@@ -3399,7 +3461,7 @@ export default Vue.extend({
         this.type = this.types[index % count];
       }
 
-      var url   = StringUtil.get(vUrl.value);
+      var url   = StringUtil.get(this.DOMS.vUrl.value);
       var index = url.indexOf('?');
       if (index >= 0) {
         var params = StringUtil.split(url.substring(index + 1), '&');
@@ -3426,9 +3488,9 @@ export default Vue.extend({
           }
         }
 
-        vUrl.value = url.substring(0, index);
+        this.DOMS.vUrl.value = url.substring(0, index);
         if ($.isEmptyObject(paramObj) == false) {
-          vInput.value = '//TODO 从 URL 上的参数转换过来：\n' + JSON.stringify(paramObj, null, '    ') + '\n//FIXME 需要与下面原来的字段合并为一个 JSON：\n' + StringUtil.get(vInput.value);
+          this.DOMS.vInput.value = '//TODO 从 URL 上的参数转换过来：\n' + JSON.stringify(paramObj, null, '    ') + '\n//FIXME 需要与下面原来的字段合并为一个 JSON：\n' + StringUtil.get(this.DOMS.vInput.value);
         }
         clearTimeout(handler);  //解决 vUrl.value 和 vInput.value 变化导致刷新，而且会把 vInput.value 重置，加上下面 onChange 再刷新就卡死了
       }
@@ -3454,7 +3516,7 @@ export default Vue.extend({
 
     showAndSend: function (branchUrl: string, req: any, isAdminOperation: boolean, callback: RequestNS.Cb) {
       this.showUrl(isAdminOperation, branchUrl);
-      vInput.value = JSON.stringify(req, null, '    ');
+      this.DOMS.vInput.value = JSON.stringify(req, null, '    ');
       this.showTestCase(false, this.isLocalShow);
       this.onChange(false);
       this.send(isAdminOperation, callback);
@@ -3469,33 +3531,33 @@ export default Vue.extend({
       }
 
       if (StringUtil.isEmpty(this.host, true)) {
-        if (StringUtil.get(vUrl.value).startsWith('http://') != true && StringUtil.get(vUrl.value).startsWith('https://') != true) {
+        if (StringUtil.get(this.DOMS.vUrl.value).startsWith('http://') != true && StringUtil.get(this.DOMS.vUrl.value).startsWith('https://') != true) {
           alert('URL 缺少 http:// 或 https:// 前缀，可能不完整或不合法，\n可能使用同域的 Host，很可能访问出错！');
         }
       } else {
-        if (StringUtil.get(vUrl.value).indexOf('://') >= 0) {
+        if (StringUtil.get(this.DOMS.vUrl.value).indexOf('://') >= 0) {
           alert('URL Host 已经隐藏(固定) 为 \n' + this.host + ' \n将会自动在前面补全，导致 URL 不合法访问出错！\n如果要改 Host，右上角设置 > 显示(编辑)URL Host');
         }
       }
 
-      this.onHandle(vInput.value);
+      this.onHandle(this.DOMS.vInput.value);
 
       clearTimeout(handler);
 
       var header;
       try {
-        header = this.getHeader(vHeader.value);
+        header = this.getHeader(this.DOMS.vHeader.value);
       } catch (e) {
         // alert(e.message)
         return;
       }
 
-      var req = this.getRequest(vInput.value);
+      var req = this.getRequest(this.DOMS.vInput.value);
 
       var url = this.getUrl();
 
-      vOutput.value = 'requesting... \nURL = ' + url;
-      this.view     = 'output';
+      this.DOMS.vOutput.value = 'requesting... \nURL = ' + url;
+      this.view               = 'output';
 
 
       if (req == undefined) {
@@ -3517,7 +3579,7 @@ export default Vue.extend({
           'type'   : this.type,
           'url'    : '/' + method,
           'request': JSON.stringify(req, null, '    '),
-          'header' : vHeader.value
+          'header' : this.DOMS.vHeader.value
         }
       });
       this.saveCache('', 'locals', this.locals);
@@ -3595,15 +3657,15 @@ export default Vue.extend({
       }
       log('onResponse url = ' + url + '\nerr = ' + err + '\nres = \n' + JSON.stringify(res));
       if (err != null) {
-        vOutput.value = 'Response:\nurl = ' + url + '\nerror = ' + err.message;
+        this.DOMS.vOutput.value = 'Response:\nurl = ' + url + '\nerror = ' + err.message;
       } else {
         var data = res.data || {};
         if (globalVars.isSingle && data.code == globalVars.CODE_SUCCESS) { //不格式化错误的结果
           data = JSONResponse.formatObject(data);
         }
-        this.jsoncon  = JSON.stringify(data, null, '    ');
-        this.view     = 'code';
-        vOutput.value = '';
+        this.jsoncon            = JSON.stringify(data, null, '    ');
+        this.view               = 'code';
+        this.DOMS.vOutput.value = '';
       }
     },
 
@@ -3850,7 +3912,7 @@ export default Vue.extend({
         case CodeUtil.LANGUAGE_PYTHON:
           s += '\n#### <= Web-Python: 注释符用 \'\#\''
               + ' \n ```python \n'
-              + CodeUtil.parsePythonRequest(null, JSON.parse(rq), 0, globalVars.isSingle, vInput.value)
+              + CodeUtil.parsePythonRequest(null, JSON.parse(rq), 0, globalVars.isSingle, this.DOMS.vInput.value)
               + '\n ``` \n注：关键词转换 null: None, false: False, true: True';
           break;
 
@@ -3891,7 +3953,7 @@ export default Vue.extend({
         return false;
       }
       doc = d;
-      vOutput.value += (
+      this.DOMS.vOutput.value += (
           '\n\n\n## 文档 \n\n 通用文档见 [APIJSON通用文档](https://github.com/Tencent/APIJSON/blob/master/Document.md#3.2) \n### 数据字典\n自动查数据库表和字段属性来生成 \n\n' + d
           + '<h3 align="center">简介</h3>'
           + '<p align="center">本站为 APIAuto-自动化接口管理平台'
@@ -3902,7 +3964,7 @@ export default Vue.extend({
       );
 
       this.view = 'markdown';
-      markdownToHTML(vOutput.value);
+      this.markdownToHTML(this.DOMS.vOutput.value);
       return true;
     },
 
@@ -4429,9 +4491,9 @@ export default Vue.extend({
           this.resetCount(this.currentRandomItem);
         }
 
-        var json   = this.getRequest(vInput.value) || {};
+        var json   = this.getRequest(this.DOMS.vInput.value) || {};
         var url    = this.getUrl();
-        var header = this.getHeader(vHeader.value);
+        var header = this.getHeader(this.DOMS.vHeader.value);
 
         ORDER_MAP = {};  //重置
 
@@ -4540,7 +4602,7 @@ export default Vue.extend({
                   }
                 };
                 if (show == true) {
-                  vInput.value = JSON.stringify(constJson, null, '    ');
+                  this.DOMS.vInput.value = JSON.stringify(constJson, null, '    ');
                   this.send(false, cb);
                 } else {
                   this.request(false, type, url, constJson, header, cb);
@@ -4594,16 +4656,16 @@ export default Vue.extend({
                 userId: (this.User || {}).id,
                 count : count,
                 name  : this.randomTestTitle,
-                config: vRandom.value
+                config: this.DOMS.vRandom.value
               }
             },
-            this.type, this.getUrl(), this.getRequest(vInput.value),
-            this.getHeader(vHeader.value),
+            this.type, this.getUrl(), this.getRequest(this.DOMS.vInput.value),
+            this.getHeader(this.DOMS.vHeader.value),
             callback,
         );
       } catch (e) {
         log(e);
-        vSend.disabled = true;
+        this.DOMS.vSend.disabled = true;
 
         this.view  = 'error';
         this.error = {
@@ -4611,7 +4673,7 @@ export default Vue.extend({
         };
 
         this.isRandomShow = true;
-        vRandom.select();
+        this.DOMS.vRandom.select();
       }
     },
 
@@ -4777,7 +4839,7 @@ export default Vue.extend({
           }
 
           // const tableName = JSONResponse.getTableName(pathKeys[pathKeys.length - 2]);
-          vOutput.value = 'requesting value for ' + tableName + '/' + key + ' from database...';
+          this.DOMS.vOutput.value = 'requesting value for ' + tableName + '/' + key + ' from database...';
 
           const args = StringUtil.split(value.substring(start + 1, end)) || [];
           const min  = StringUtil.isEmpty(args[0], true) ? null : +args[0];
@@ -4821,9 +4883,9 @@ export default Vue.extend({
 
             var data: IndexedObj = (res || {}).data || {};
             if (data.code != globalVars.CODE_SUCCESS) {
-              respCount     = -reqCount;
-              vOutput.value = '随机测试 为第 ' + (which + 1) + ' 行\n  ' + p_k + '  \n获取数据库数据 异常：\n' + data.msg;
-              alert(StringUtil.get(vOutput.value));
+              respCount               = -reqCount;
+              this.DOMS.vOutput.value = '随机测试 为第 ' + (which + 1) + ' 行\n  ' + p_k + '  \n获取数据库数据 异常：\n' + data.msg;
+              alert(StringUtil.get(this.DOMS.vOutput.value));
               return;
               // throw new Error('随机测试 为\n  ' + tableName + '/' + key + '  \n获取数据库数据 异常：\n' + data.msg)
             }
@@ -5540,6 +5602,7 @@ export default Vue.extend({
 
 // APIJSON >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+//—————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 
     fix__testIncrease() {
       if (this.isRandomListShow || this.isRandomSubListShow) {
@@ -5549,6 +5612,80 @@ export default Vue.extend({
       } else {
         this.showExport(true, true, true);
       }
+    },
+
+    bindDoms() {
+      //TODO 保留，用v-model绑定到App.data会报错，各种undefined
+      this.DOMS.vUrl        = document.getElementById('vUrl') as HTMLInputElement;
+      this.DOMS.vUrlComment = document.getElementById('vUrlComment') as HTMLInputElement;
+      this.DOMS.vTransfer   = document.getElementById('vTransfer') as HTMLInputElement;
+      this.DOMS.vType       = document.getElementById('vType') as HTMLInputElement;
+      this.DOMS.vSend       = document.getElementById('vSend') as HTMLInputElement;
+
+      this.DOMS.vInput   = document.getElementById('vInput') as HTMLInputElement;
+      this.DOMS.vComment = document.getElementById('vComment') as HTMLInputElement;
+      this.DOMS.vHeader  = document.getElementById('vHeader') as HTMLInputElement;
+      this.DOMS.vRandom  = document.getElementById('vRandom') as HTMLInputElement;
+      this.DOMS.vOutput  = document.getElementById('vOutput') as HTMLInputElement;
+
+      this.DOMS.vAccount  = document.getElementById('vAccount') as HTMLInputElement;
+      this.DOMS.vPassword = document.getElementById('vPassword') as HTMLInputElement;
+      this.DOMS.vVerify   = document.getElementById('vVerify') as HTMLInputElement;
+      this.DOMS.vRemember = document.getElementById('vRemember') as HTMLInputElement;
+
+      this.DOMS.vUrl.value = String(globalVars.URL_BASE + '/get'); //main.js里访问不到，可能是script引用顺序问题
+
+      this.DOMS.vMarkdown        = document.getElementById('vMarkdown') as HTMLInputElement;
+      this.DOMS.vPage            = document.getElementById('vPage') as HTMLInputElement;
+      this.DOMS.vCount           = document.getElementById('vCount') as HTMLInputElement;
+      this.DOMS.vSearch          = document.getElementById('vSearch') as HTMLInputElement;
+      this.DOMS.vTestCasePage    = document.getElementById('vTestCasePage') as HTMLInputElement;
+      this.DOMS.vTestCaseCount   = document.getElementById('vTestCaseCount') as HTMLInputElement;
+      this.DOMS.vTestCaseSearch  = document.getElementById('vTestCaseSearch') as HTMLInputElement;
+      this.DOMS.vRandomPage      = document.getElementById('vRandomPage') as HTMLInputElement;
+      this.DOMS.vRandomCount     = document.getElementById('vRandomCount') as HTMLInputElement;
+      this.DOMS.vRandomSearch    = document.getElementById('vRandomSearch') as HTMLInputElement;
+      this.DOMS.vRandomSubPage   = document.getElementById('vRandomSubPage') as HTMLInputElement;
+      this.DOMS.vRandomSubCount  = document.getElementById('vRandomSubCount') as HTMLInputElement;
+      this.DOMS.vRandomSubSearch = document.getElementById('vRandomSubSearch') as HTMLInputElement;
+
+
+      //vComment跟随vInput滚动，避免JSON重叠"露馅"
+      $(this.DOMS.vInput).on('scroll', this.onScrollChanged);
+
+
+      //vURLComment跟随vUrl滚动，避免JSON重叠"露馅"
+      $(this.DOMS.vUrl).on('scroll', this.onURLScrollChanged);
+    },
+
+    onScrollChanged() {
+      $(this.DOMS.vComment).scrollLeft(this.DOMS.vInput.scrollLeft);
+      $(this.DOMS.vComment).scrollTop(this.DOMS.vInput.scrollTop);
+    },
+
+
+    onURLScrollChanged() {
+      $(this.DOMS.vUrlComment).scrollLeft(this.DOMS.vUrl.scrollLeft);
+    },
+
+
+    markdownToHTML(md: string) {
+      this.DOMS.vMarkdown.innerHTML = '';
+      editormd.markdownToHTML('vMarkdown', {
+        markdown       : md,//+ "\r\n" + $("#append-test").text(),
+        //htmlDecode      : true,       // 开启 HTML 标签解析，为了安全性，默认不开启
+        htmlDecode     : 'style,script,iframe',  // you can filter tags decode
+        //toc             : false,
+        tocm           : true,    // Using [TOCM]
+        //tocContainer    : "#custom-toc-container", // 自定义 ToC 容器层
+        //gfm             : false,
+        tocDropdown    : true,
+        // markdownSourceCode : true, // 是否保留 Markdown 源码，即是否删除保存源码的 Textarea 标签
+        taskList       : true,
+        tex            : true,  // 默认不解析
+        flowChart      : true,  // 默认不解析
+        sequenceDiagram: true,  // 默认不解析
+      });
     },
 
   },

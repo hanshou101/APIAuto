@@ -10,7 +10,7 @@ module.exports = {
       //
       //
       `ncp    ./js          ./dist/js         --filter '**/*.*'`,
-      `ncp    ./apijson     ./dist/apijson    --filter '**/*.*'`,
+      // `ncp    ./apijson     ./dist/apijson    --filter '**/*.*'`,        // 已处理完毕，内置化了
       `ncp    ./md          ./dist/md         --filter '**/*.*'`,
       `ncp    ./svg         ./dist/svg        --filter '**/*.*'`,   // WARN 为了处理【--no-minify】后，svg相关文件，打包后位置不正确的问题
     ),

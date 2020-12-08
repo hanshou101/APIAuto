@@ -65,6 +65,7 @@
     }
   </style>
 
+  <div id="app" style="background-color: white"></div>
 
   <!--用于移动的时候遮住文本域 避免被选中-->
   <div class="widnow-cover">
@@ -172,81 +173,83 @@
   <!--  <script type="text/javascript" language="JavaScript" charset="UTF-8" src="src/apijson/CodeUtil.js"></script>-->
   <!-- 必须在main.js前 TODO 可能有冲突，代码写入vue文件？ >>>>>>>>>>>>>>>> -->
 
+  <!--
+    <script type="text/javascript" language="JavaScript" charset="UTF-8">
+      //TODO 保留，用v-model绑定到App.data会报错，各种undefined
+      var vUrl        = document.getElementById('vUrl');
+      var vUrlComment = document.getElementById('vUrlComment');
+      var vTransfer   = document.getElementById('vTransfer');
+      var vType       = document.getElementById('vType');
+      var vSend       = document.getElementById('vSend');
+
+      var vInput   = document.getElementById('vInput');
+      var vComment = document.getElementById('vComment');
+      var vHeader  = document.getElementById('vHeader');
+      var vRandom  = document.getElementById('vRandom');
+      var vOutput  = document.getElementById('vOutput');
+
+      var vAccount  = document.getElementById('vAccount');
+      var vPassword = document.getElementById('vPassword');
+      var vVerify   = document.getElementById('vVerify');
+      var vRemember = document.getElementById('vRemember');
+
+      vUrl.value = String(window.globalVars.URL_BASE + '/get'); //main.js里访问不到，可能是script引用顺序问题
+
+      var vMarkdown        = document.getElementById('vMarkdown');
+      var vPage            = document.getElementById('vPage');
+      var vCount           = document.getElementById('vCount');
+      var vSearch          = document.getElementById('vSearch');
+      var vTestCasePage    = document.getElementById('vTestCasePage');
+      var vTestCaseCount   = document.getElementById('vTestCaseCount');
+      var vTestCaseSearch  = document.getElementById('vTestCaseSearch');
+      var vRandomPage      = document.getElementById('vRandomPage');
+      var vRandomCount     = document.getElementById('vRandomCount');
+      var vRandomSearch    = document.getElementById('vRandomSearch');
+      var vRandomSubPage   = document.getElementById('vRandomSubPage');
+      var vRandomSubCount  = document.getElementById('vRandomSubCount');
+      var vRandomSubSearch = document.getElementById('vRandomSubSearch');
+
+
+      function onScrollChanged() {
+        $(vComment).scrollLeft(vInput.scrollLeft);
+        $(vComment).scrollTop(vInput.scrollTop);
+      }
+
+      //vComment跟随vInput滚动，避免JSON重叠"露馅"
+      $(vInput).on('scroll', onScrollChanged);
+
+
+      function onURLScrollChanged() {
+        $(vUrlComment).scrollLeft(vUrl.scrollLeft);
+      }
+
+      //vURLComment跟随vUrl滚动，避免JSON重叠"露馅"
+      $(vUrl).on('scroll', onURLScrollChanged);
+
+
+      function markdownToHTML(md) {
+        vMarkdown.innerHTML = '';
+        editormd.markdownToHTML('vMarkdown', {
+          markdown       : md,//+ "\r\n" + $("#append-test").text(),
+          //htmlDecode      : true,       // 开启 HTML 标签解析，为了安全性，默认不开启
+          htmlDecode     : 'style,script,iframe',  // you can filter tags decode
+          //toc             : false,
+          tocm           : true,    // Using [TOCM]
+          //tocContainer    : "#custom-toc-container", // 自定义 ToC 容器层
+          //gfm             : false,
+          tocDropdown    : true,
+          // markdownSourceCode : true, // 是否保留 Markdown 源码，即是否删除保存源码的 Textarea 标签
+          taskList       : true,
+          tex            : true,  // 默认不解析
+          flowChart      : true,  // 默认不解析
+          sequenceDiagram: true,  // 默认不解析
+        });
+      }
+    </script>
+    -->
 
   <script src="src/main.ts"></script>
 
-  <script type="text/javascript" language="JavaScript" charset="UTF-8">
-    //TODO 保留，用v-model绑定到App.data会报错，各种undefined
-    var vUrl        = document.getElementById('vUrl');
-    var vUrlComment = document.getElementById('vUrlComment');
-    var vTransfer   = document.getElementById('vTransfer');
-    var vType       = document.getElementById('vType');
-    var vSend       = document.getElementById('vSend');
-
-    var vInput   = document.getElementById('vInput');
-    var vComment = document.getElementById('vComment');
-    var vHeader  = document.getElementById('vHeader');
-    var vRandom  = document.getElementById('vRandom');
-    var vOutput  = document.getElementById('vOutput');
-
-    var vAccount  = document.getElementById('vAccount');
-    var vPassword = document.getElementById('vPassword');
-    var vVerify   = document.getElementById('vVerify');
-    var vRemember = document.getElementById('vRemember');
-
-    vUrl.value = new String(URL_BASE + '/get'); //main.js里访问不到，可能是script引用顺序问题
-
-    var vMarkdown        = document.getElementById('vMarkdown');
-    var vPage            = document.getElementById('vPage');
-    var vCount           = document.getElementById('vCount');
-    var vSearch          = document.getElementById('vSearch');
-    var vTestCasePage    = document.getElementById('vTestCasePage');
-    var vTestCaseCount   = document.getElementById('vTestCaseCount');
-    var vTestCaseSearch  = document.getElementById('vTestCaseSearch');
-    var vRandomPage      = document.getElementById('vRandomPage');
-    var vRandomCount     = document.getElementById('vRandomCount');
-    var vRandomSearch    = document.getElementById('vRandomSearch');
-    var vRandomSubPage   = document.getElementById('vRandomSubPage');
-    var vRandomSubCount  = document.getElementById('vRandomSubCount');
-    var vRandomSubSearch = document.getElementById('vRandomSubSearch');
-
-
-    function onScrollChanged() {
-      $(vComment).scrollLeft(vInput.scrollLeft);
-      $(vComment).scrollTop(vInput.scrollTop);
-    }
-
-    //vComment跟随vInput滚动，避免JSON重叠"露馅"
-    $(vInput).on('scroll', onScrollChanged);
-
-
-    function onURLScrollChanged() {
-      $(vUrlComment).scrollLeft(vUrl.scrollLeft);
-    }
-
-    //vURLComment跟随vUrl滚动，避免JSON重叠"露馅"
-    $(vUrl).on('scroll', onURLScrollChanged);
-
-
-    function markdownToHTML(md) {
-      vMarkdown.innerHTML = '';
-      editormd.markdownToHTML('vMarkdown', {
-        markdown       : md,//+ "\r\n" + $("#append-test").text(),
-        //htmlDecode      : true,       // 开启 HTML 标签解析，为了安全性，默认不开启
-        htmlDecode     : 'style,script,iframe',  // you can filter tags decode
-        //toc             : false,
-        tocm           : true,    // Using [TOCM]
-        //tocContainer    : "#custom-toc-container", // 自定义 ToC 容器层
-        //gfm             : false,
-        tocDropdown    : true,
-        // markdownSourceCode : true, // 是否保留 Markdown 源码，即是否删除保存源码的 Textarea 标签
-        taskList       : true,
-        tex            : true,  // 默认不解析
-        flowChart      : true,  // 默认不解析
-        sequenceDiagram: true,  // 默认不解析
-      });
-    }
-  </script>
   <script src="md/lib/jquery.min.js"></script>
   <script src="md/lib/marked.min.js"></script>
   <script src="md/lib/prettify.min.js"></script>
