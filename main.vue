@@ -954,7 +954,8 @@ export default Vue.extend({
       this.showJsonView();
     }
   },
-
+  created() {
+  },
   // 为正确取到DOM，需要在 mounted 之后，进行dom获取。
   mounted() {
 
@@ -999,7 +1000,7 @@ export default Vue.extend({
       this.isHeaderShow      = this.getCache('', 'isHeaderShow') || this.isHeaderShow;
       this.isRandomShow      = this.getCache('', 'isRandomShow') || this.isRandomShow;
     } catch (e) {
-      console.log('created  try { ' +
+      console.error('created  try { ' +
           '\nvar url = this.getCache(, url) ...' +
           '\n} catch (e) {\n' + e.message);
     }
@@ -1010,7 +1011,7 @@ export default Vue.extend({
         this.currentAccountIndex = this.getCache(globalVars.URL_BASE, 'currentAccountIndex');
       }
     } catch (e) {
-      console.log('created  try { ' +
+      console.error('created  try { ' +
           '\nvar accounts = this.getCache(URL_BASE, accounts)' +
           '\n} catch (e) {\n' + e.message);
     }
@@ -1032,7 +1033,7 @@ export default Vue.extend({
       this.randomSubCount = this.getCache(this.server, 'randomSubCount') || this.randomSubCount;
 
     } catch (e) {
-      console.log('created  try { ' +
+      console.error('created  try { ' +
           '\nthis.User = this.getCache(this.server, User) || {}' +
           '\n} catch (e) {\n' + e.message);
     }
@@ -1043,8 +1044,6 @@ export default Vue.extend({
     this.transfer();
 
 
-  },
-  mounted() {
   },
   updated() {
   },
@@ -1092,6 +1091,7 @@ export default Vue.extend({
       try {
         oldJSON = jsonlint.parse(this.jsoncon);
       } catch (ex) {
+        console.error(ex);
         this.view  = 'error';
         this.error = {
           msg: '原 JSON 解析错误\r\n' + ex.message
@@ -1102,6 +1102,7 @@ export default Vue.extend({
       try {
         newJSON = jsonlint.parse(this.jsoncon);
       } catch (ex) {
+        console.error(ex);
         this.view  = 'error';
         this.error = {
           msg: '新 JSON 解析错误\r\n' + ex.message
@@ -1160,6 +1161,7 @@ export default Vue.extend({
 
         }
       } catch (ex) {
+        console.error(ex);
         this.view  = 'error';
         this.error = {
           msg: ex.message
@@ -2177,6 +2179,7 @@ export default Vue.extend({
                 try {
                   this.onResponse(url, res, err as Error);
                 } catch (e) {
+                  console.error(e);
                 }
 
                 var data = res.data == null ? null : res.data.data;
@@ -2331,6 +2334,7 @@ export default Vue.extend({
       try {
         jsonData = JSON.parse(docUrl);
       } catch (e) {
+        console.error(e);
       }
 
       var host    = this.getBaseUrl();
@@ -3311,6 +3315,7 @@ export default Vue.extend({
         try {
           this.header = this.getHeader(this.DOMS.vHeader.value);
         } catch (e2) {
+          console.error(e2);
           this.isHeaderShow = true;
           this.DOMS.vHeader.select();
           throw new Error(e2.message);
@@ -3342,6 +3347,7 @@ export default Vue.extend({
         try {
           code = this.getCode(after); //必须在before还是用 " 时使用，后面用会因为解析 ' 导致失败
         } catch (e) {
+          console.error(e);
           code = '\n\n\n建议:\n使用其它浏览器，例如 谷歌Chrome、火狐FireFox 或者 微软Edge， 因为这样能自动生成请求代码.'
               + '\nError:\n' + e.message + '\n\n\n';
         }
@@ -3482,6 +3488,7 @@ export default Vue.extend({
             try {
               v = JSON.parse(v);
             } catch (e) {
+              console.error(e);
             }
 
             paramObj[p.substring(0, ind)] = v;
@@ -3548,6 +3555,7 @@ export default Vue.extend({
       try {
         header = this.getHeader(this.DOMS.vHeader.value);
       } catch (e) {
+        console.error(e);
         // alert(e.message)
         return;
       }
@@ -4879,6 +4887,7 @@ export default Vue.extend({
             try {
               this.onResponse(url, res, err as Error);
             } catch (e) {
+              console.error(e);
             }
 
             var data: IndexedObj = (res || {}).data || {};

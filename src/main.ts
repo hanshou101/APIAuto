@@ -104,7 +104,7 @@ Vue.use({
         return false;
       }
 
-      var method    = (App).getMethod();
+      var method    = (AppTrueCp).getMethod();
       var mIndex    = method == null ? -1 : method.indexOf('/');
       var isRestful = mIndex > 0 && mIndex < method.length - 1;
 
@@ -226,7 +226,7 @@ Vue.use({
         var table  = null;
         var column = null;
 
-        var method    = (App).getMethod();
+        var method    = (AppTrueCp).getMethod();
         var mIndex    = method == null ? -1 : method.indexOf('/');
         var isRestful = mIndex > 0 && mIndex < method.length - 1;
 
@@ -301,7 +301,7 @@ Vue.use({
 
                 var pathUri = (StringUtil.isEmpty(path) ? '' : path + '/') + key;
 
-                var c = CodeUtil.getCommentFromDoc(globalVars.docObj == null ? null : globalVars.docObj['[]'], table, column, (App).getMethod(), (App).database, (App).language, true, false, pathUri.split('/'), isRestful, val); // this.getResponseHint({}, table, $event
+                var c = CodeUtil.getCommentFromDoc(globalVars.docObj == null ? null : globalVars.docObj['[]'], table, column, (AppTrueCp).getMethod(), (AppTrueCp).database, (AppTrueCp).language, true, false, pathUri.split('/'), isRestful, val); // this.getResponseHint({}, table, $event
                 s0    = column + (StringUtil.isEmpty(c, true) ? '' : ': ' + c);
               }
 
@@ -309,7 +309,7 @@ Vue.use({
 
               var c = CodeUtil.getCommentFromDoc(
                 globalVars.docObj == null ? null : globalVars.docObj['[]'], table, isRestful ? key : null,
-                (App).getMethod(), (App).database, (App).language,
+                (AppTrueCp).getMethod(), (AppTrueCp).database, (AppTrueCp).language,
                 true, false, pathUri.split('/'), isRestful, val);
               s     = (StringUtil.isEmpty(path) ? '' : path + '/') + key + ' 中 '
                 + (
@@ -332,7 +332,7 @@ Vue.use({
         // alert('setResponseHint  table = ' + table + '; column = ' + column)
 
         var pathUri = (StringUtil.isEmpty(path) ? '' : path + '/') + key;
-        var c       = CodeUtil.getCommentFromDoc(globalVars.docObj == null ? null : globalVars.docObj['[]'], table, isRestful ? key : column, method, (App).database, (App).language, true, false, pathUri.split('/'), isRestful, val);
+        var c       = CodeUtil.getCommentFromDoc(globalVars.docObj == null ? null : globalVars.docObj['[]'], table, isRestful ? key : column, method, (AppTrueCp).database, (AppTrueCp).language, true, false, pathUri.split('/'), isRestful, val);
 
         s += pathUri + (StringUtil.isEmpty(c, true) ? '' : ': ' + c);
       } catch (e) {
@@ -349,8 +349,13 @@ Vue.use({
 
 // APIJSON >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-var App: any = new Vue({
+var __App = new Vue({
   el    : '#app',
   render: (h) => h(Main),
 });
 // .$mount('#app');
+
+
+var AppTrueCp: any = __App.$children[0];
+
+// console.log('App', App);
