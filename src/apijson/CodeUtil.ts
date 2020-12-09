@@ -77,7 +77,7 @@ var CodeUtil = {
    * @return parseComment
    */
   parseComment: function (reqStr: string, tableList: null | Array<any>, method: null | string,
-                          database: string, language: string, isReq: boolean|string,
+                          database: string, language: string, isReq: boolean | string,
                           unknown_param?: unknown,
   ) { //怎么都获取不到真正的长度，cols不行，默认20不变，maxLineLength不行，默认undefined不变 , maxLineLength) {
     if (StringUtil.isEmpty(reqStr)) {
@@ -5966,7 +5966,7 @@ var CodeUtil = {
    * @param database
    */
   getComment4Request: function (tableList: Array<any> | null, name: string, key: string, value: TypeNS.ValueType, method: string,
-                                isInSubquery: boolean, database: string, language: string, isReq: boolean, names: null | Array<any>, isRestful: boolean,
+                                isInSubquery: boolean, database: string, language: string, isReq: boolean | string, names: null | Array<any>, isRestful: boolean,
   ) {
     // alert('name = ' + name + '; key = ' + key + '; value = ' + value + '; method = ' + method);
 
@@ -6223,7 +6223,7 @@ var CodeUtil = {
    */
   getCommentFromDoc: function (
     tableList: null | Array<any>, tableName: string, columnName: null | string, method: string, database: string, language: string,
-    onlyTableAndColumn?: boolean, isReq?: boolean, pathKeys?: null | Array<string>, isRestful?: boolean, value?: any
+    onlyTableAndColumn?: boolean, isReq?: boolean | string, pathKeys?: null | Array<string>, isRestful?: boolean, value?: any
   ): string {
     log('getCommentFromDoc  tableName = ' + tableName + '; columnName = ' + columnName
       + '; method = ' + method + '; database = ' + database + '; language = ' + language
